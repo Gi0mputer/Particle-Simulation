@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.10)
+
+# Nome del progetto
+project(ParticleSimulation)
+
+# Imposta lo standard C++
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+# Trova GLFW
+find_package(glfw3 REQUIRED)
+
+# Trova OpenGL
+find_package(OpenGL REQUIRED)
+
+# Aggiungi directory include
+include_directories(include)
+
+# Aggiungi i file sorgenti
+file(GLOB SOURCES "src/*.cpp" "src/glad.c") # Include glad.c e altri file sorgenti
+
+# Crea l'eseguibile
+add_executable(ParticleSimulation ${SOURCES})
+
+# Collega GLFW, OpenGL e GLAD
+target_link_libraries(ParticleSimulation glfw OpenGL::GL)
