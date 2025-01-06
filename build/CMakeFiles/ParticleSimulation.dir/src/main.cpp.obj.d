@@ -140,12 +140,14 @@ CMakeFiles/ParticleSimulation.dir/src/main.cpp.obj: \
  C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/KHR/khrplatform.h \
  C:/msys64/ucrt64/lib/gcc/x86_64-w64-mingw32/14.2.0/include/stdint.h \
  C:/msys64/ucrt64/include/stdint.h C:/msys64/ucrt64/include/GLFW/glfw3.h \
- C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/Simulation.h \
+ C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/simulation.h \
  C:/msys64/ucrt64/include/c++/14.2.0/vector \
  C:/msys64/ucrt64/include/c++/14.2.0/bits/stl_uninitialized.h \
  C:/msys64/ucrt64/include/c++/14.2.0/bits/stl_vector.h \
  C:/msys64/ucrt64/include/c++/14.2.0/bits/stl_bvector.h \
  C:/msys64/ucrt64/include/c++/14.2.0/bits/vector.tcc \
  C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/Particle.h \
- C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/Renderer.h \
- C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/particle.h
+ C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/renderer.h \
+ C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/particle.h \
+ C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/shaderprogram.h \
+ C:/Users/giova/Progetti/PROGET~1/PARTIC~1/include/mode.h

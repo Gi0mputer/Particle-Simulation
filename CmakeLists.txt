@@ -7,20 +7,36 @@ project(ParticleSimulation)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Trova GLFW
+# Librerie necessarie
+find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
 
-# Trova OpenGL
-find_package(OpenGL REQUIRED)
-
-# Aggiungi directory include
-include_directories(include)
+# Includi la directory "include/" (che contiene glad.h e KHR/)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # Aggiungi i file sorgenti
-file(GLOB SOURCES "src/*.cpp" "src/glad.c") # Include glad.c e altri file sorgenti
+file(GLOB SOURCES
+    ${CMAKE_SOURCE_DIR}/src/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/glad.c
+)
+
+# Aggiungi i file shader
+file(GLOB SHADERS
+    ${CMAKE_SOURCE_DIR}/shaders/*.vert
+    ${CMAKE_SOURCE_DIR}/shaders/*.frag
+    )
 
 # Crea l'eseguibile
 add_executable(ParticleSimulation ${SOURCES})
 
 # Collega GLFW, OpenGL e GLAD
 target_link_libraries(ParticleSimulation glfw OpenGL::GL)
+
+
+# Copia la cartella "shaders" nella cartella di output (bin/ o build/)
+add_custom_command(TARGET ParticleSimulation POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:ParticleSimulation>/shaders
+)
+        

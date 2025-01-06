@@ -224,6 +224,30 @@ src/renderer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.s
 .PHONY : src/renderer.cpp.s
 
+src/shaderprogram.obj: src/shaderprogram.cpp.obj
+.PHONY : src/shaderprogram.obj
+
+# target to build an object file
+src/shaderprogram.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj
+.PHONY : src/shaderprogram.cpp.obj
+
+src/shaderprogram.i: src/shaderprogram.cpp.i
+.PHONY : src/shaderprogram.i
+
+# target to preprocess a source file
+src/shaderprogram.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.i
+.PHONY : src/shaderprogram.cpp.i
+
+src/shaderprogram.s: src/shaderprogram.cpp.s
+.PHONY : src/shaderprogram.s
+
+# target to generate assembly for a file
+src/shaderprogram.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.s
+.PHONY : src/shaderprogram.cpp.s
+
 src/simulation.obj: src/simulation.cpp.obj
 .PHONY : src/simulation.obj
 
@@ -269,6 +293,9 @@ help:
 	@echo ... src/renderer.obj
 	@echo ... src/renderer.i
 	@echo ... src/renderer.s
+	@echo ... src/shaderprogram.obj
+	@echo ... src/shaderprogram.i
+	@echo ... src/shaderprogram.s
 	@echo ... src/simulation.obj
 	@echo ... src/simulation.i
 	@echo ... src/simulation.s

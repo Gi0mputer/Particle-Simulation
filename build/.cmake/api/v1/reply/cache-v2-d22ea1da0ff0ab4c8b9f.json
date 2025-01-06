@@ -671,7 +671,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "C:/Program Files (x86)/SimulationProject"
+			"value" : "C:/Program Files (x86)/ParticleSimulation"
 		},
 		{
 			"name" : "CMAKE_LINKER",
@@ -1367,42 +1367,6 @@
 		},
 		{
 			"name" : "ParticleSimulation_SOURCE_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation"
-		},
-		{
-			"name" : "SimulationProject_BINARY_DIR",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build"
-		},
-		{
-			"name" : "SimulationProject_IS_TOP_LEVEL",
-			"properties" : 
-			[
-				{
-					"name" : "HELPSTRING",
-					"value" : "Value Computed by CMake"
-				}
-			],
-			"type" : "STATIC",
-			"value" : "ON"
-		},
-		{
-			"name" : "SimulationProject_SOURCE_DIR",
 			"properties" : 
 			[
 				{

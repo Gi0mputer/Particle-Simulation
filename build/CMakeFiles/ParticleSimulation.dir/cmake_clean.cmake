@@ -7,6 +7,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj.d"
   "CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj"
   "CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj.d"
+  "CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj"
+  "CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj.d"
   "CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj"
   "CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj.d"
   "ParticleSimulation.exe"

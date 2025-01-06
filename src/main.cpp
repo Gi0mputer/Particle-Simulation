@@ -1,22 +1,26 @@
-#include <iostream> // Include per std::cerr e std::cout
-#include <glad/glad.h> // Include per OpenGL
-#include <GLFW/glfw3.h> // Include per GLFW
-#include "Simulation.h" // Simulazione delle particelle
-#include "Renderer.h" // Rendering delle particelle
+#include <iostream>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-int main() {
-    // Inizializza GLFW
+#include "simulation.h"   // Simulation class
+#include "renderer.h"     // VAO/VBO management
+#include "shaderprogram.h"// Shader program management
+#include "mode.h"      // Enum class SimulationMode
+
+int main(int argc, char** argv)
+{
+    // 1) Inizializza GLFW
     if (!glfwInit()) {
         std::cerr << "Errore nell'inizializzazione di GLFW!" << std::endl;
         return -1;
     }
 
-    // Configurazione del contesto OpenGL
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); // OpenGL 4.x
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5); // OpenGL 4.5
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // Core Profile
+    // 2) Configura OpenGL
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    // Creazione della finestra
+    // 3) Crea la finestra
     GLFWwindow* window = glfwCreateWindow(800, 600, "Particle Simulation", nullptr, nullptr);
     if (!window) {
         std::cerr << "Errore nella creazione della finestra!" << std::endl;
@@ -25,41 +29,53 @@ int main() {
     }
     glfwMakeContextCurrent(window);
 
-    // Inizializza GLAD
+    // 4) Inizializza GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Errore nell'inizializzazione di GLAD!" << std::endl;
         return -1;
     }
 
-    // Configura OpenGL
+    // 5) Viewport e altre impostazioni
     glViewport(0, 0, 800, 600);
-    glEnable(GL_PROGRAM_POINT_SIZE); // Abilita la modifica della dimensione dei punti
-    glPointSize(5.0f); // Imposta la dimensione dei punti
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glPointSize(5.0f);
 
-    // Inizializza la simulazione e il renderer
-    Simulation sim(1000, 800, 600); // 1000 particelle
-    Renderer renderer(sim.getParticles()); // Renderer con le particelle iniziali
+    // Imposta la modalità (per ora SOLO "SIMPLE")
+    SimulationMode mode = SimulationMode::SIMPLE;
 
-    // Loop principale
-    while (!glfwWindowShouldClose(window)) {
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f); // Colore di sfondo
-        glClear(GL_COLOR_BUFFER_BIT); // Pulisce il buffer dello schermo
+    // 6) Inizializza la simulazione su CPU
+    Simulation sim(1000, 800, 600);
 
-        // Aggiorna la simulazione
+    // 7) Inizializza il renderer (VAO/VBO)
+    Renderer renderer(sim.getParticles());
+
+    // 8) Crea uno shader program base (per disegnare punti)
+    ShaderProgram myShader("shaders/basic.vert", "shaders/basic.frag");
+
+    // 9) Main loop
+    while (!glfwWindowShouldClose(window))
+    {
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // 9a) Aggiorna la simulazione (CPU)
         sim.update(0.01f);
 
-        // Aggiorna i dati del buffer con le posizioni aggiornate
+        // 9b) Aggiorna i dati del buffer
         renderer.updateBuffer(sim.getParticles());
 
-        // Disegna le particelle
+        // 9c) Usa lo shader banale
+        myShader.use();
+
+        // 9d) Disegna i punti
         renderer.draw();
 
-        // Swap buffers e gestione degli eventi
+        // 9e) Swap buffers e poll events
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // Cleanup
+    // 10) Cleanup
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
