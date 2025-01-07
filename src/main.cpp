@@ -2,15 +2,16 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "simulation.h"   // Simulation class
-#include "renderer.h"     // VAO/VBO management
-#include "shaderprogram.h"// Shader program management
-#include "mode.h"      // Enum class SimulationMode
+#include "simulation.h"    // Simulation class
+#include "renderer.h"      // VAO/VBO management
+#include "shaderprogram.h" // Shader program management
+#include "mode.h"          // Enum class SimulationMode
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
     // 1) Inizializza GLFW
-    if (!glfwInit()) {
+    if (!glfwInit())
+    {
         std::cerr << "Errore nell'inizializzazione di GLFW!" << std::endl;
         return -1;
     }
@@ -21,8 +22,9 @@ int main(int argc, char** argv)
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     // 3) Crea la finestra
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Particle Simulation", nullptr, nullptr);
-    if (!window) {
+    GLFWwindow *window = glfwCreateWindow(800, 600, "Particle Simulation", nullptr, nullptr);
+    if (!window)
+    {
         std::cerr << "Errore nella creazione della finestra!" << std::endl;
         glfwTerminate();
         return -1;
@@ -30,7 +32,8 @@ int main(int argc, char** argv)
     glfwMakeContextCurrent(window);
 
     // 4) Inizializza GLAD
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
         std::cerr << "Errore nell'inizializzazione di GLAD!" << std::endl;
         return -1;
     }

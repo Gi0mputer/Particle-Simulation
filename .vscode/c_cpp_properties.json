@@ -3,7 +3,7 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/include", // Directory per glad.h e KHR/
+                "${workspaceFolder}/include", // Directory per glad/ e KHR/
                 "${workspaceFolder}/include/glad",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/**"
