@@ -101,11 +101,26 @@ CMakeFiles/ParticleSimulation.dir/src/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/ParticleSimulation.dir/src/main.cpp.s"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\main.cpp" -o CMakeFiles\ParticleSimulation.dir\src\main.cpp.s
 
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj: CMakeFiles/ParticleSimulation.dir/flags.make
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/openglutils.cpp
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\openglutils.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\openglutils.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\openglutils.cpp"
+
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.i"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\openglutils.cpp" > CMakeFiles\ParticleSimulation.dir\src\openglutils.cpp.i
+
+CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.s"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\openglutils.cpp" -o CMakeFiles\ParticleSimulation.dir\src\openglutils.cpp.s
+
 CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj: CMakeFiles/ParticleSimulation.dir/flags.make
 CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
 CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/particle.cpp
 CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\particle.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\particle.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\particle.cpp"
 
 CMakeFiles/ParticleSimulation.dir/src/particle.cpp.i: cmake_force
@@ -120,7 +135,7 @@ CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj: CMakeFiles/ParticleSimul
 CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
 CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/renderer.cpp
 CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\renderer.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\renderer.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\renderer.cpp"
 
 CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.i: cmake_force
@@ -135,7 +150,7 @@ CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj: CMakeFiles/Particle
 CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
 CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/shaderprogram.cpp
 CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\shaderprogram.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\shaderprogram.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\shaderprogram.cpp"
 
 CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.i: cmake_force
@@ -150,7 +165,7 @@ CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj: CMakeFiles/ParticleSim
 CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
 CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/simulation.cpp
 CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\simulation.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\simulation.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\simulation.cpp"
 
 CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.i: cmake_force
@@ -161,30 +176,66 @@ CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.s"
 	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\simulation.cpp" -o CMakeFiles\ParticleSimulation.dir\src\simulation.cpp.s
 
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/flags.make
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/simulationmanager.cpp
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\simulationmanager.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\simulationmanager.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\simulationmanager.cpp"
+
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.i"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\simulationmanager.cpp" > CMakeFiles\ParticleSimulation.dir\src\simulationmanager.cpp.i
+
+CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.s"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\simulationmanager.cpp" -o CMakeFiles\ParticleSimulation.dir\src\simulationmanager.cpp.s
+
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/flags.make
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj: C:/Users/giova/Progetti/Progetti\ VS\ code/Particle-Simulation/src/windowmanager.cpp
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj: CMakeFiles/ParticleSimulation.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj -MF CMakeFiles\ParticleSimulation.dir\src\windowmanager.cpp.obj.d -o CMakeFiles\ParticleSimulation.dir\src\windowmanager.cpp.obj -c "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\windowmanager.cpp"
+
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.i"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\windowmanager.cpp" > CMakeFiles\ParticleSimulation.dir\src\windowmanager.cpp.i
+
+CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.s"
+	C:\msys64\ucrt64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S "C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\src\windowmanager.cpp" -o CMakeFiles\ParticleSimulation.dir\src\windowmanager.cpp.s
+
 # Object files for target ParticleSimulation
 ParticleSimulation_OBJECTS = \
 "CMakeFiles/ParticleSimulation.dir/src/glad.c.obj" \
 "CMakeFiles/ParticleSimulation.dir/src/main.cpp.obj" \
+"CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj" \
 "CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj" \
 "CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj" \
 "CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj" \
-"CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj"
+"CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj" \
+"CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj" \
+"CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj"
 
 # External object files for target ParticleSimulation
 ParticleSimulation_EXTERNAL_OBJECTS =
 
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/glad.c.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/main.cpp.obj
+ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/renderer.cpp.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/shaderprogram.cpp.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj
+ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj
+ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/build.make
 ParticleSimulation.exe: C:/msys64/ucrt64/lib/libglfw3.dll.a
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/linkLibs.rsp
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/objects1.rsp
 ParticleSimulation.exe: CMakeFiles/ParticleSimulation.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX executable ParticleSimulation.exe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir="C:\Users\giova\Progetti\Progetti VS code\Particle-Simulation\build\CMakeFiles" --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX executable ParticleSimulation.exe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles\ParticleSimulation.dir\link.txt --verbose=$(VERBOSE)
 	C:\msys64\ucrt64\bin\cmake.exe -E copy_directory "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/shaders" "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build/shaders"
 

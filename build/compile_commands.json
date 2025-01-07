@@ -13,6 +13,12 @@
 },
 {
   "directory": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -DGLFW_DLL @CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ParticleSimulation.dir\\src\\openglutils.cpp.obj -c \"C:\\Users\\giova\\Progetti\\Progetti VS code\\Particle-Simulation\\src\\openglutils.cpp\"",
+  "file": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/src/openglutils.cpp",
+  "output": "CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj"
+},
+{
+  "directory": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build",
   "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -DGLFW_DLL @CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ParticleSimulation.dir\\src\\particle.cpp.obj -c \"C:\\Users\\giova\\Progetti\\Progetti VS code\\Particle-Simulation\\src\\particle.cpp\"",
   "file": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/src/particle.cpp",
   "output": "CMakeFiles/ParticleSimulation.dir/src/particle.cpp.obj"
@@ -34,5 +40,17 @@
   "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -DGLFW_DLL @CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ParticleSimulation.dir\\src\\simulation.cpp.obj -c \"C:\\Users\\giova\\Progetti\\Progetti VS code\\Particle-Simulation\\src\\simulation.cpp\"",
   "file": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/src/simulation.cpp",
   "output": "CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.obj"
+},
+{
+  "directory": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -DGLFW_DLL @CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ParticleSimulation.dir\\src\\simulationmanager.cpp.obj -c \"C:\\Users\\giova\\Progetti\\Progetti VS code\\Particle-Simulation\\src\\simulationmanager.cpp\"",
+  "file": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/src/simulationmanager.cpp",
+  "output": "CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj"
+},
+{
+  "directory": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\c++.exe -DGLFW_DLL @CMakeFiles/ParticleSimulation.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\ParticleSimulation.dir\\src\\windowmanager.cpp.obj -c \"C:\\Users\\giova\\Progetti\\Progetti VS code\\Particle-Simulation\\src\\windowmanager.cpp\"",
+  "file": "C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/src/windowmanager.cpp",
+  "output": "CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj"
 }
 ]

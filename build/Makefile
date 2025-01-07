@@ -176,6 +176,30 @@ src/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/main.cpp.s
 .PHONY : src/main.cpp.s
 
+src/openglutils.obj: src/openglutils.cpp.obj
+.PHONY : src/openglutils.obj
+
+# target to build an object file
+src/openglutils.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.obj
+.PHONY : src/openglutils.cpp.obj
+
+src/openglutils.i: src/openglutils.cpp.i
+.PHONY : src/openglutils.i
+
+# target to preprocess a source file
+src/openglutils.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.i
+.PHONY : src/openglutils.cpp.i
+
+src/openglutils.s: src/openglutils.cpp.s
+.PHONY : src/openglutils.s
+
+# target to generate assembly for a file
+src/openglutils.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/openglutils.cpp.s
+.PHONY : src/openglutils.cpp.s
+
 src/particle.obj: src/particle.cpp.obj
 .PHONY : src/particle.obj
 
@@ -272,6 +296,54 @@ src/simulation.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/simulation.cpp.s
 .PHONY : src/simulation.cpp.s
 
+src/simulationmanager.obj: src/simulationmanager.cpp.obj
+.PHONY : src/simulationmanager.obj
+
+# target to build an object file
+src/simulationmanager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.obj
+.PHONY : src/simulationmanager.cpp.obj
+
+src/simulationmanager.i: src/simulationmanager.cpp.i
+.PHONY : src/simulationmanager.i
+
+# target to preprocess a source file
+src/simulationmanager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.i
+.PHONY : src/simulationmanager.cpp.i
+
+src/simulationmanager.s: src/simulationmanager.cpp.s
+.PHONY : src/simulationmanager.s
+
+# target to generate assembly for a file
+src/simulationmanager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/simulationmanager.cpp.s
+.PHONY : src/simulationmanager.cpp.s
+
+src/windowmanager.obj: src/windowmanager.cpp.obj
+.PHONY : src/windowmanager.obj
+
+# target to build an object file
+src/windowmanager.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.obj
+.PHONY : src/windowmanager.cpp.obj
+
+src/windowmanager.i: src/windowmanager.cpp.i
+.PHONY : src/windowmanager.i
+
+# target to preprocess a source file
+src/windowmanager.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.i
+.PHONY : src/windowmanager.cpp.i
+
+src/windowmanager.s: src/windowmanager.cpp.s
+.PHONY : src/windowmanager.s
+
+# target to generate assembly for a file
+src/windowmanager.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\ParticleSimulation.dir\build.make CMakeFiles/ParticleSimulation.dir/src/windowmanager.cpp.s
+.PHONY : src/windowmanager.cpp.s
+
 # Help Target
 help:
 	@echo The following are some of the valid targets for this Makefile:
@@ -287,6 +359,9 @@ help:
 	@echo ... src/main.obj
 	@echo ... src/main.i
 	@echo ... src/main.s
+	@echo ... src/openglutils.obj
+	@echo ... src/openglutils.i
+	@echo ... src/openglutils.s
 	@echo ... src/particle.obj
 	@echo ... src/particle.i
 	@echo ... src/particle.s
@@ -299,6 +374,12 @@ help:
 	@echo ... src/simulation.obj
 	@echo ... src/simulation.i
 	@echo ... src/simulation.s
+	@echo ... src/simulationmanager.obj
+	@echo ... src/simulationmanager.i
+	@echo ... src/simulationmanager.s
+	@echo ... src/windowmanager.obj
+	@echo ... src/windowmanager.i
+	@echo ... src/windowmanager.s
 .PHONY : help
 
 

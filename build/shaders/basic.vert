@@ -1,12 +1,9 @@
 #version 450 core
+layout(location = 0) in vec2 aPos; // Posizione delle particelle
+uniform vec2 uScreenSize;          // Dimensione dello schermo
 
-layout(location = 0) in vec2 aPos;
-
-// In “modalità semplice” assumiamo che le coordinate delle particelle
-// siano già “in clip space” (ovvero nell’intervallo [-1..1] in X e Y).
-// Quindi NON facciamo trasformazioni, le passiamo direttamente:
-
-void main()
-{
-    gl_Position = vec4(aPos, 0.0, 1.0);
+void main() {
+    vec2 normalizedPos = (aPos / uScreenSize) * 2.0 - 1.0; // Mappa in [-1, 1]
+    gl_Position = vec4(normalizedPos, 0.0, 1.0); // Mappa in [-1, 1]
+    gl_PointSize = 1.0;
 }
