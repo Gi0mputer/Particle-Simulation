@@ -1,3 +1,0 @@
-C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build/CMakeFiles/ParticleSimulation.dir
-C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build/CMakeFiles/edit_cache.dir
-C:/Users/giova/Progetti/Progetti VS code/Particle-Simulation/build/CMakeFiles/rebuild_cache.dir
