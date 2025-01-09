@@ -7,6 +7,11 @@ project(ParticleSimulation)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Opzioni di configurazione
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)  # Output nella cartella build/bin
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib) # Librerie statiche in build/lib
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib) # Librerie dinamiche in build/lib
+
 # Librerie necessarie
 find_package(OpenGL REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -24,7 +29,7 @@ file(GLOB SOURCES
 file(GLOB SHADERS
     ${CMAKE_SOURCE_DIR}/shaders/*.vert
     ${CMAKE_SOURCE_DIR}/shaders/*.frag
-    )
+)
 
 # Crea l'eseguibile
 add_executable(ParticleSimulation ${SOURCES})
@@ -32,11 +37,9 @@ add_executable(ParticleSimulation ${SOURCES})
 # Collega GLFW, OpenGL e GLAD
 target_link_libraries(ParticleSimulation glfw OpenGL::GL)
 
-
-# Copia la cartella "shaders" nella cartella di output (bin/ o build/)
+# Copia la cartella "shaders" nella directory di output
 add_custom_command(TARGET ParticleSimulation POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_SOURCE_DIR}/shaders
-    $<TARGET_FILE_DIR:ParticleSimulation>/shaders
+    ${CMAKE_BINARY_DIR}/bin/shaders
 )
-        

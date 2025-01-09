@@ -1,4 +1,5 @@
 {
-    "cmake.generator": "MinGW Makefiles",
-    "cmake.buildDirectory": "${workspaceFolder}/build"
+    "cmake.generator": "Ninja", // Usa Ninja come generatore predefinito
+    "cmake.buildDirectory": "${workspaceFolder}/build", // Directory di build
+    "cmake.configureOnOpen": true // Configura automaticamente il progetto
 }
