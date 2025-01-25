@@ -1,4 +1,4 @@
-#include "simulationmanager.h"
+#include "SimulationManager.h"
 #include <GLFW/glfw3.h>
 
 void SimulationManager::getSimulationSize(SimulationResolution resolution, int& simWidth, int& simHeight) {
@@ -10,11 +10,15 @@ void SimulationManager::getSimulationSize(SimulationResolution resolution, int& 
             simWidth = mode->width;
             simHeight = mode->height;
             break;
-        case SimulationResolution::HD:
+        case SimulationResolution::UHD_4K:
+            simWidth = 3840;
+            simHeight = 2160; 
+            break;
+        case SimulationResolution::FHD_1080:
             simWidth = 1920;
             simHeight = 1080;
             break;
-        case SimulationResolution::SD:
+        case SimulationResolution::HD_720:
             simWidth = 1280;
             simHeight = 720;
             break;

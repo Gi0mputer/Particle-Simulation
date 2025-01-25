@@ -1,5 +1,4 @@
-#ifndef WINDOW_MANAGER_H
-#define WINDOW_MANAGER_H
+#pragma once
 
 #include <GLFW/glfw3.h>
 
@@ -13,6 +12,9 @@ public:
     void handleInput();
     void swapBuffers();
 
+    int getWidth() const;
+    int getHeight() const;
+
 private:
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
     void toggleFullscreen();
@@ -22,5 +24,3 @@ private:
     int windowedX, windowedY, windowedWidth, windowedHeight;
     bool isFullscreen;
 };
-
-#endif // WINDOW_MANAGER_H

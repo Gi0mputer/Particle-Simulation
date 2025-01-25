@@ -1,11 +1,12 @@
-#ifndef SIMULATION_MANAGER_H
-#define SIMULATION_MANAGER_H
+#pragma once
 
-#include "Mode.h"
-
+enum class SimulationResolution {
+    HD_720,
+    FHD_1080,
+    UHD_4K,
+    NATIVE
+};
 class SimulationManager {
 public:
     static void getSimulationSize(SimulationResolution resolution, int& simWidth, int& simHeight);
 };
-
-#endif // SIMULATION_MANAGER_H

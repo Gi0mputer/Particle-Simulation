@@ -1,11 +1,13 @@
-#ifndef PARTICLE_H
-#define PARTICLE_H
+#pragma once
 
 #include <cmath>
 
 struct Particle {
     float x, y;  // Posizione
     float angle, speed; // Angolo e velocità
+
+    // Costruttore predefinito
+    Particle() : x(0), y(0), angle(0), speed(0) {}
 
     Particle(float x, float y, float angle, float speed)
         : x(x), y(y), angle(angle), speed(speed) {}
@@ -16,5 +18,3 @@ struct Particle {
         y += speed * std::sin(angle) * deltaTime;
     }
 };
-
-#endif

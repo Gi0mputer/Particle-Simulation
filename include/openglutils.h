@@ -1,11 +1,17 @@
-#ifndef OPENGL_UTILS_H
-#define OPENGL_UTILS_H
+#pragma once
 
-class OpenGLUtils {
-public:
-    static void initializeGLAD();
-    static void configureOpenGL();
-    static void clearScreen();
-};
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-#endif // OPENGL_UTILS_H
+namespace OpenGLUtils
+{
+    // Inizializza GLAD
+    bool initializeGLAD();
+
+    // Configura alcuni stati di base di OpenGL
+    void configureOpenGL();
+
+    // (Facoltativo) Se vuoi funzioni di checking error, debug, ecc.
+    // void enableDebugCallback();
+}
+

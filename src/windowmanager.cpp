@@ -68,7 +68,12 @@ void WindowManager::swapBuffers() {
 }
 
 void WindowManager::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
+
     glViewport(0, 0, width, height);
+
+    WindowManager* wm = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));
+    wm->windowedWidth = width;
+    wm->windowedHeight = height;
 }
 
 void WindowManager::toggleFullscreen() {
@@ -87,4 +92,11 @@ void WindowManager::toggleFullscreen() {
     }
 
     isFullscreen = !isFullscreen;
+}
+
+int WindowManager::getWidth() const {
+    return windowedWidth;
+}
+int WindowManager::getHeight() const {
+    return windowedHeight;
 }
