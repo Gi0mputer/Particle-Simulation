@@ -1,24 +1,27 @@
-#ifndef SHADER_PROGRAM_H
-#define SHADER_PROGRAM_H
-
+#pragma once
 #include <string>
 #include <glad/glad.h>
 
-class ShaderProgram {
+class ShaderProgram
+{
 public:
-    // Costruttore: riceve i path ai file .vert e .frag
-    ShaderProgram(const char* vertexPath, const char* fragmentPath);
+    ShaderProgram();
     ~ShaderProgram();
 
+    // Carica, compila e linka i due shader (vertex + fragment)
+    void load(const std::string& vertexPath, const std::string& fragmentPath);
+
+    // Attiva il programma
     void use() const;
 
-    GLuint getID() const { return programID; }
+    // Restituisce l’ID del program (se serve)
+    GLuint getID() const { return m_programID; }
 
 private:
-    GLuint programID;
+    GLuint m_programID;
+    bool m_isLoaded;
 
-    std::string loadFile(const char* path);
-    GLuint compileShader(GLenum type, const std::string& source);
+    // Se vuoi funzioni private per compilare e linkare
+    GLuint compileShader(const std::string& source, GLenum shaderType);
+    std::string readFile(const std::string& filePath);
 };
-
-#endif // SHADER_PROGRAM_H
