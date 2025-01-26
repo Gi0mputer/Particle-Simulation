@@ -1,0 +1,126 @@
+#version 450 core
+
+#define PI 3.1415926535897932384626433832795
+
+struct GpuParticle {
+    float x;
+    float y;
+    float angle;
+    float speed;
+};
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) buffer Particles {
+    GpuParticle particles[];
+};
+
+// Uniforms per il delta time, le dimensioni della simulazione e la forza gravitazionale
+uniform float uDeltaTime;
+uniform vec2  uSimSize;
+uniform float uGravityStrength;
+uniform float uRandomStrength;
+uniform float uTime; // Nuova uniform per il tempo cumulativo
+
+// Funzione pseudo-casuale migliorata basata su seed e tempo
+float rand(uint seed, float time)
+{
+    return fract(sin(float(seed) * 12.9898 + time * 78.233) * 43758.5453);
+}
+
+void main()
+{
+    uint idx = gl_GlobalInvocationID.x;
+
+    GpuParticle p = particles[idx];
+
+    // Calcola la posizione del centro della simulazione
+    vec2 center = uSimSize * 0.5;
+
+    // Calcola il vettore dalla particella al centro
+    vec2 directionToCenter = center - vec2(p.x, p.y);
+    float distanceToCenter = length(directionToCenter);
+
+    // Definisci una soglia per considerare una particella "al centro"
+    float epsilon = 0.1; // Adatta questo valore in base alla scala della tua simulazione
+
+    float desiredAngle;
+
+    if (distanceToCenter > epsilon)
+    {
+        // Calcola l'angolo desiderato verso il centro
+        desiredAngle = atan(directionToCenter.y, directionToCenter.x);
+    }
+    else
+    {
+        // Assegna un angolo casuale per spingere la particella fuori dal centro
+        desiredAngle = rand(idx, uTime) * 2.0 * PI;
+    }
+
+    // Calcola la differenza tra l'angolo desiderato e l'angolo corrente
+    float angleDifference = desiredAngle - p.angle;
+
+    // Normalizza la differenza degli angoli per essere tra -π e π
+    angleDifference = mod(angleDifference + PI, 2.0 * PI) - PI;
+
+    // Limita la rotazione a 45 gradi per frame
+    angleDifference = clamp(angleDifference, -PI / 4.0, PI / 4.0);
+
+    // Aggiorna l'angolo della particella verso il centro
+    p.angle += angleDifference * uGravityStrength;
+
+    // Genera un valore casuale con il tempo cumulativo
+    float randomValue = (rand(idx, uTime) * 2.0) - 1.0; // Valore tra -1 e 1
+
+    // Aggiungi la variazione casuale all'angolo
+    p.angle += randomValue * uRandomStrength;
+
+    // Normalizza l'angolo nell'intervallo [0, 2π)
+    p.angle = mod(p.angle, 2.0 * PI);
+    if (p.angle < 0.0)
+    {
+        p.angle += 2.0 * PI;
+    }
+
+    // Aggiorna la posizione basata su angolo e velocità
+    p.x += p.speed * cos(p.angle) * uDeltaTime;
+    p.y += p.speed * sin(p.angle) * uDeltaTime;
+
+    // Logica di rimbalzo sui bordi
+    bool bounced = false;
+
+    if (p.x < 0.0) {
+        p.x = 0.0;
+        p.angle = PI - p.angle;
+        bounced = true;
+    }
+    else if (p.x > uSimSize.x) {
+        p.x = uSimSize.x;
+        p.angle = PI - p.angle;
+        bounced = true;
+    }
+
+    if (p.y < 0.0) {
+        p.y = 0.0;
+        p.angle = -p.angle;
+        bounced = true;
+    }
+    else if (p.y > uSimSize.y) {
+        p.y = uSimSize.y;
+        p.angle = -p.angle;
+        bounced = true;
+    }
+
+    if (bounced)
+    {
+        // Normalizza nuovamente l'angolo dopo il rimbalzo
+        p.angle = mod(p.angle, 2.0 * PI);
+        if (p.angle < 0.0)
+        {
+            p.angle += 2.0 * PI;
+        }
+    }
+
+    // Salva la particella aggiornata
+    particles[idx] = p;
+}

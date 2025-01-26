@@ -1,25 +1,13 @@
-#include "RenderPipeline.h"
-
 #include <iostream>
 #include <stdexcept>
+#include "SimulationGPU.h"
+#include "RenderPipeline.h"
 
 // Costruttore
 RenderPipeline::RenderPipeline(int width, int height)
-    : m_width(width)
-    , m_height(height)
-    , m_outputWidth(width)     // per default, se non settiamo diversamente
-    , m_outputHeight(height) 
-    , m_usePing(true)
-    , m_pingFBO(0)
-    , m_pingTexture(0)
-    , m_pongFBO(0)
-    , m_pongTexture(0)
-    , m_quadVAO(0)
-    , m_quadVBO(0)
-    , m_particlesVAO(0)
-    , m_particlesVBO(0)
-    , m_trailShader()
-    , m_finalShader()
+    : m_width(width), m_height(height), m_outputWidth(width) // per default, se non settiamo diversamente
+      ,
+      m_outputHeight(height), m_usePing(true), m_pingFBO(0), m_pingTexture(0), m_pongFBO(0), m_pongTexture(0), m_quadVAO(0), m_quadVBO(0), m_particlesVAO(0), m_particlesVBO(0), m_trailShader(), m_finalShader()
 {
 }
 
@@ -42,7 +30,7 @@ RenderPipeline::~RenderPipeline()
     glDeleteBuffers(1, &m_particlesVBO);
 
     // Gli ShaderProgram si distruggono automaticamente se implementano un destructor
-    // o se semplicemente i loro oggetti vanno fuori scope. 
+    // o se semplicemente i loro oggetti vanno fuori scope.
 }
 
 // Inizializza la pipeline
@@ -71,15 +59,15 @@ void RenderPipeline::initialize()
     glBindVertexArray(m_particlesVAO);
     glEnableVertexAttribArray(0);
     // Se la struttura di Particle è (x, y), allora:
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Particle), (void *)0);
     glBindVertexArray(0);
 
     // 5) Altre impostazioni generiche (se servono)
     // es. glEnable(GL_POINT_SPRITE), se stai usando particelle come GL_POINTS.
 }
 
-// rendering principale
-void RenderPipeline::render(const ISimulation& simulation, int windowWidth, int windowHeight)
+// Rendering principale
+void RenderPipeline::render(const ISimulation &simulation, int windowWidth, int windowHeight)
 {
     m_outputWidth = windowWidth;
     m_outputHeight = windowHeight;
@@ -96,77 +84,79 @@ void RenderPipeline::render(const ISimulation& simulation, int windowWidth, int 
     // 4) PASS FINALE: Disegna sul framebuffer di default la texture finale (pong o ping a seconda di come hai fatto lo swap).
     finalPass();
 }
+
 void RenderPipeline::drawParticlesPass(const ISimulation& simulation)
 {
-    // (Facoltativo) se la simulazione è CPU-based, carichiamo i dati su m_particlesVBO
-    // supponiamo che Particle contenga (x,y) come primi due float
-    {
-        glBindBuffer(GL_ARRAY_BUFFER, m_particlesVBO);
-        const auto& particles = simulation.getParticles();
-        glBufferData(GL_ARRAY_BUFFER,
-                     particles.size() * sizeof(Particle), 
-                     particles.data(),
-                     GL_DYNAMIC_DRAW);
-    }
-
-    // Scegli FBO (ping o pong)
+    // 1) Scegli FBO
     GLuint currentFBO = m_usePing ? m_pingFBO : m_pongFBO;
     beginPingPong(currentFBO);
 
-    // Clear (nero)
-    glClearColor(0.f, 0.f, 0.f, 0.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Usa brushShader
     m_brushShader.use();
-
-    // Se in brush.vert hai uniform vec2 uSimSize
     GLint loc = glGetUniformLocation(m_brushShader.getID(), "uSimSize");
-    if(loc >= 0) {
-        glUniform2f(loc, (float)m_width, (float)m_height);
+    if (loc >= 0) {
+        glUniform2f(loc, float(m_width), float(m_height));
     }
 
-    // Disegna i punti
     glBindVertexArray(m_particlesVAO);
-    const auto& particles = simulation.getParticles();
-    glDrawArrays(GL_POINTS, 0, (GLsizei)particles.size());
+
+    const auto* simGPU = dynamic_cast<const SimulationGPU*>(&simulation);
+    if (simGPU) {
+        // GPU path
+        glBindBuffer(GL_ARRAY_BUFFER, simGPU->getParticleBufferID());
+        // supponendo che la struttura GpuParticle sia (x,y,vx,vy),
+        // e vogliamo disegnare solo (x,y) => offset 0, stride sizeof(GpuParticle)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glDrawArrays(GL_POINTS, 0, simGPU->getParticleCount());
+    }
+    else {
+        // CPU path
+        glBindBuffer(GL_ARRAY_BUFFER, m_particlesVBO);
+        const auto& particles = simulation.getParticles();
+        glBufferData(GL_ARRAY_BUFFER,
+                     particles.size() * sizeof(Particle),
+                     particles.data(),
+                     GL_DYNAMIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Particle), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glDrawArrays(GL_POINTS, 0, (GLsizei)particles.size());
+    }
 
     endPingPong();
 }
 
-// --------------------------------------------------------------------------
 // PASS 2: Scia / trail
-// --------------------------------------------------------------------------
 void RenderPipeline::trailPass()
 {
-    GLuint readTex  = m_usePing ? m_pingTexture : m_pongTexture;
+    GLuint readTex = m_usePing ? m_pingTexture : m_pongTexture;
     GLuint writeFBO = m_usePing ? m_pongFBO : m_pingFBO;
 
     beginPingPong(writeFBO);
-    //glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
 
     m_trailShader.use();
-
-    // Esempio: uniform float uDecay
-    // glUniform1f(glGetUniformLocation(m_trailShader.getID(), "uDecay"), 0.98f);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, readTex);
     glUniform1i(glGetUniformLocation(m_trailShader.getID(), "uTexture"), 0);
 
+    glUniform2f(glGetUniformLocation(m_trailShader.getID(), "uResolution"), (float)m_width, (float)m_height);
+    glUniform1f(glGetUniformLocation(m_trailShader.getID(), "uBlurStrength"), 0.5f); // esempio
+    glUniform1f(glGetUniformLocation(m_trailShader.getID(), "uFade"), 0.80f);
+    glUniform4f(glGetUniformLocation(m_trailShader.getID(), "uBgColor"), 0.0, 0.0, 0.0, 1.0);
+
     // Disegno su un quad fullscreen
     renderQuad();
 
-    //endPingPong();
+    endPingPong();
 
     // Swap ping-pong
-    //swapPingPong();
+    swapPingPong();
 }
 
-// --------------------------------------------------------------------------
 // PASS 3: Disegna la texture finale sullo schermo
-// --------------------------------------------------------------------------
 void RenderPipeline::finalPass()
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -187,9 +177,7 @@ void RenderPipeline::finalPass()
     renderQuad();
 }
 
-// --------------------------------------------------------------------------
 // Supporto: creazione di un FBO e texture associata
-// --------------------------------------------------------------------------
 void RenderPipeline::createFBOAndTexture(GLuint &fbo, GLuint &texture)
 {
     // Crea texture
@@ -197,8 +185,10 @@ void RenderPipeline::createFBOAndTexture(GLuint &fbo, GLuint &texture)
     glBindTexture(GL_TEXTURE_2D, texture);
 
     // Formato RGBA32F per avere abbastanza precisione, va bene anche RGBA8
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); 
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width, m_height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -211,7 +201,8 @@ void RenderPipeline::createFBOAndTexture(GLuint &fbo, GLuint &texture)
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
 
     // Verifica stato FBO
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
         throw std::runtime_error("Error creating framebuffer");
     }
 
@@ -221,17 +212,14 @@ void RenderPipeline::createFBOAndTexture(GLuint &fbo, GLuint &texture)
 
 // --------------------------------------------------------------------------
 // Supporto: setup del VAO/VBO per disegnare un quad fullscreen
-// --------------------------------------------------------------------------
 void RenderPipeline::setupQuadVAO()
 {
     float quadVertices[] = {
         // pos      // tex
-        -1.f, -1.f,  0.f, 0.f,
-         1.f, -1.f,  1.f, 0.f,
-         1.f,  1.f,  1.f, 1.f,
-        -1.f,  1.f,  0.f, 1.f
-    };
-
+        -1.f, -1.f, 0.f, 0.f,
+        1.f, -1.f, 1.f, 0.f,
+        1.f, 1.f, 1.f, 1.f,
+        -1.f, 1.f, 0.f, 1.f};
 
     glGenVertexArrays(1, &m_quadVAO);
     glGenBuffers(1, &m_quadVBO);
@@ -244,17 +232,15 @@ void RenderPipeline::setupQuadVAO()
     //  - attribute 0: posizione (vec2)
     //  - attribute 1: texcoord  (vec2)
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
 
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
 
     glBindVertexArray(0);
 }
 
-// --------------------------------------------------------------------------
 // Supporto: disegna un quad fullscreen
-// --------------------------------------------------------------------------
 void RenderPipeline::renderQuad()
 {
     glBindVertexArray(m_quadVAO);
@@ -263,24 +249,19 @@ void RenderPipeline::renderQuad()
     glBindVertexArray(0);
 }
 
-// --------------------------------------------------------------------------
 // Supporto: binding FBO e settaggio viewport
-// --------------------------------------------------------------------------
 void RenderPipeline::beginPingPong(GLuint fbo)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glViewport(0, 0, m_width, m_height);
 }
 
-// --------------------------------------------------------------------------
 void RenderPipeline::endPingPong()
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-// --------------------------------------------------------------------------
 // Scambia i ruoli tra ping e pong
-// --------------------------------------------------------------------------
 void RenderPipeline::swapPingPong()
 {
     m_usePing = !m_usePing;

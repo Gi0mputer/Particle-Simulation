@@ -1,27 +1,53 @@
 #pragma once
-#include "ISimulation.h"
+
 #include <vector>
-#include "Particle.h"
+#include <string>
+#include "ISimulation.h"
 
 class SimulationGPU : public ISimulation
 {
 public:
     SimulationGPU(int particleCount, int width, int height);
+    ~SimulationGPU();
 
     void initialize() override;
     void update(float dt) override;
-    const std::vector<Particle>& getParticles() const override;
-    int getParticleCount() const override;
 
-    // (In futuro) potresti aggiungere metodi per restituire
-    // un buffer GPU, ID di un SSBO, ecc.
+    // GPU-based: potremmo restituire un vettore vuoto in getParticles()
+    // se non vogliamo scaricare i dati su CPU.
+    const std::vector<Particle> &getParticles() const override
+    {
+        // Non carichiamo nulla su CPU
+        static std::vector<Particle> dummy;
+        return dummy;
+    }
+
+    int getParticleCount() const override
+    {
+        return m_particleCount;
+    }
+    
+public:
+    GLuint getParticleBufferID() const
+    {
+        return m_particleBuffer; // dove m_particleBuffer e' la SSBO/VBO
+    }
 
 private:
+    void createComputeShader(const std::string &compPath);
+
+    // Parametri
     int m_particleCount;
     int m_width, m_height;
 
-    // GPU resource placeholders
-    unsigned int m_computeShaderID;
-    unsigned int m_particleBuffer; // SSBO o VBO
-    // ...
+    // handle per computeShader e buffer
+    GLuint m_computeShaderID;
+    GLuint m_programID;
+
+    // SSBO o VBO per le particelle
+    GLuint m_particleBuffer;
+
+    bool m_initialized;
+
+    // eventuali funzioni private
 };

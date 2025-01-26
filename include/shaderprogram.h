@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
+
+// Librerie OpenGL e GLFW
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
 class ShaderProgram
 {
@@ -14,7 +17,7 @@ public:
     // Attiva il programma
     void use() const;
 
-    // Restituisce l’ID del program (se serve)
+    // Restituisce l’ID del program
     GLuint getID() const { return m_programID; }
 
 private:

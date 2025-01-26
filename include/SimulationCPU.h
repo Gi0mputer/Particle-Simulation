@@ -1,9 +1,10 @@
 // SimulationCPU.h
 #pragma once
-#include "ISimulation.h"
 #include <vector>
 #include <algorithm>  // std::clamp
-#include "Particle.h"
+
+
+#include "ISimulation.h"
 #define M_PI 3.14159265358979323846
 
 class SimulationCPU : public ISimulation

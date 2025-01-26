@@ -11,5 +11,5 @@ void main()
     gl_Position = vec4(nx, ny, 0.0, 1.0);
 
     // Per disegnare punti più grandi (se vuoi), ad es:
-    gl_PointSize = 3.0;
+    gl_PointSize = 0.1;
 }

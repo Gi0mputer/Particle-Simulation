@@ -1,7 +1,32 @@
 #pragma once
 
 #include <vector>
-#include "Particle.h" 
+#include <cmath>
+// Librerie OpenGL e GLFW
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+struct GpuParticle {
+    float x, y;  // Posizione
+    float angle, speed; // Angolo e velocità
+};
+
+struct Particle { 
+    float x, y;
+    float angle;
+    float speed;
+
+    Particle() : x(0), y(0), angle(0), speed(0) {}
+
+    Particle(float x, float y, float angle, float speed)
+        : x(x), y(y), angle(angle), speed(speed) {}
+
+    // Funzione per aggiornare la posizione in base all'angolo e alla velocità
+    void updatePosition(float deltaTime) {
+        x += speed * std::cos(angle) * deltaTime;
+        y += speed * std::sin(angle) * deltaTime;
+    }
+};
 
 class ISimulation
 {

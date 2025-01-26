@@ -1,4 +1,4 @@
-// SimulationFactory.cpp
+
 #include "SimulationFactory.h"
 #include "SimulationCPU.h"
 #include "SimulationGPU.h"

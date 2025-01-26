@@ -1,12 +1,8 @@
-
-// --------------------------------------------------------------------------
-// SimulationCPU.cpp
 #include "SimulationCPU.h"
 #include <cstdlib> // per rand() se vuoi generare posizioni random
 #include <cmath>
 #include <random>
 #include <algorithm>
-#include "Particle.h"
 
 // Generatore di numeri casuali (puoi tenerlo globale/statistico, o all'interno della classe)
 static std::mt19937 rng(std::random_device{}());
@@ -32,8 +28,6 @@ void SimulationCPU::initialize()
         m_particles.emplace_back(x, y, angle, speed);
     }
 }
-
-
 
 void SimulationCPU::update(float dt)
 {
