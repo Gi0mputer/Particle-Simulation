@@ -2,7 +2,8 @@
 
 namespace Utils
 {
-
+    //------------------------------------------------------------
+    // Gestione del timestep
     // Costruttore: definisci un dt fisso
     TimestepManager::TimestepManager(double fixedDt)
         : m_fixedDt(fixedDt), m_accumulator(0.0), m_lastFrameTime(0.0)
@@ -134,14 +135,6 @@ namespace Utils
         // glPointSize(5.0f);
     }
 
-    // Esempio di altre funzioni se le vuoi
-    // void clearScreen()
-    // {
-    //     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    //     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // }
-
-    // void enableDebugCallback()
     // {
     //     ...
     // }

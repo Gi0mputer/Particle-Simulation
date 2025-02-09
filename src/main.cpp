@@ -3,19 +3,17 @@
 #include <chrono> // Per misurare i tempi CPU
 #include <string>
 
-// Librerie OpenGL e GLFW
+// Includiamo prima GLAD (che deve essere inizializzato prima di GLFW)
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// Header delle classi create
-#include "WindowManager.h"
-#include "RenderPipeline.h"
-#include "ISimulation.h"
-#include "SimulationCPU.h"
-#include "Utils.h"
-#include "SimulationFactory.h"
-#include "Utils.h"
-#include "InputHandler.h"
+// Include dei file header del progetto
+#include "WindowManager.h"     // Gestisce la creazione della finestra e il contesto OpenGL
+#include "RenderPipeline.h"    // Gestisce i pass di rendering (inclusi effetti post-process e ping-pong)
+#include "SimulationGPU.h"     // Simulazione particellare basata su compute shader
+#include "Utils.h"             // Funzioni di utilità, configurazione OpenGL, gestione timestep e FPS
+#include "InputHandler.h"      // Gestione degli input (mouse, tastiera, ecc.)
+
 
 int main(int argc, char **argv)
 {
@@ -34,24 +32,20 @@ int main(int argc, char **argv)
         }
         Utils::configureOpenGL();
 
-        //// 3.  SIMULAZIONE
+        //// 3. SIMULAZIONE
         int simWidth, simHeight;
         Utils::SimulationManager::getSimulationSize(Utils::SimulationResolution::HD_720, simWidth, simHeight);
         std::cout << "[Simulation] Dimensioni fisse: " << simWidth << " x " << simHeight << std::endl;
-        // Decidi se usare CPU o GPU
-        bool useGPU = true;
-        std::cout << "[Simulation] Using " << (useGPU ? "GPU" : "CPU") << " version.\n";
-        ISimulation *simulation = SimulationFactory::createSimulation(
-            useGPU ? SimulationType::GPU : SimulationType::CPU,
-            10000000, simWidth, simHeight);
-        simulation->initialize();
+        // Crea e inizializza la simulazione GPU.
+        // La classe SimulationGPU si occupa di gestire i buffer delle particelle e di aggiornare
+        // la simulazione tramite compute shader.
+        SimulationGPU simulation(100000, simWidth, simHeight); // Esempio: 10.000 particelle
+        simulation.initialize();
 
         //// 4. RENDER PIPELINE
         RenderPipeline renderPipeline(simWidth, simHeight);
         renderPipeline.initialize();
-        // (Facoltativo) se vuoi passare reference della simulazione per configurare, es:
-        // renderPipeline.setSimulation(&simulation);
-
+       
         //// 5. TIMESTEPPER
         Utils::TimestepManager timeStepper(1.0/60.0);
         // Inizializza con l'ora attuale
@@ -61,35 +55,37 @@ int main(int argc, char **argv)
         //// 6. LOOP PRINCIPALE
         while (!windowManager.shouldClose())
         {
-            
+            // Gestione degli eventi (input, window events, ecc.)
             glfwPollEvents();
             inputHandler.update();
 
-            double now = glfwGetTime();
-            timeStepper.update(now);
+            // Aggiorna il gestore dei timestep con il tempo attuale
+            double currentTime = glfwGetTime();
+            timeStepper.update(currentTime);
 
-            while(timeStepper.hasSteps()) {
+            // Esegue gli aggiornamenti della simulazione a passo fisso
+            while (timeStepper.hasSteps())
+            {
                 double dt = timeStepper.getStepDt();
-                simulation->update((float)dt);
+                simulation.update(static_cast<float>(dt));
             }
 
-            renderPipeline.render(*simulation, windowManager.getWidth(), windowManager.getHeight());
-            // I valori stampati (o usati per modificare il titolo della finestra) sono tempi CPU, quindi se la GPU è impegnata su un calcolo interno e non eseguiamo un “glFinish” o uno “Sync/Wait”, potremmo misurare meno di quanto la GPU impiega davvero.
-            // Per un vero benchmark GPU servirebbe l’uso di OpenGL timer queries (es. glGenQueries, glBeginQuery(GL_TIME_ELAPSED, queryID), glEndQuery(...), glGetQueryObjectui64v(...), ecc.).
-            // Se hai glfwSwapInterval(1) attivo, la chiamata a swapBuffers() bloccherà a ~60 fps (o la frequenza del monitor), “nascondendo” parte del tuo tempo di rendering.
-            // Se vuoi un framerate sbloccato, disattiva vsync (glfwSwapInterval(0)) e valuta un capping manuale se necessario.
-
+            // Esegue il rendering della scena: la pipeline legge i dati aggiornati dalla simulazione GPU
+            renderPipeline.render(simulation, windowManager.getWidth(), windowManager.getHeight());
+             
             fpsCounter.update();
             if (fpsCounter.shouldRefreshTitle())
             {
                 int fps = fpsCounter.getFPS();
+                std::string newTitle = "Particle Simulation - FPS: " + std::to_string(fps);
+                //windowManager.setWindowTitle(newTitle); // da implementare
             }
-
+            // Swap dei buffer per visualizzare il frame renderizzato
             windowManager.swapBuffers();
         }
 
-        // cleanup automatico nel distruttore delle classi
-        delete simulation;
+        // 7. PULIZIA E USCITA
+        // Le risorse vengono liberate automaticamente dai destructors delle classi utilizzate.
         return 0;
     }
     catch (const std::exception &e)
@@ -98,3 +94,6 @@ int main(int argc, char **argv)
         return -1;
     }
 }
+
+
+

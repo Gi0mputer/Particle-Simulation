@@ -1,53 +1,58 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include "ISimulation.h"
+#include <glad/glad.h>
 
-class SimulationGPU : public ISimulation
+// Struttura GpuParticle
+struct GpuParticle {
+    float position[2];
+    float angle;
+    float speed;
+};
+
+class SimulationGPU
 {
 public:
     SimulationGPU(int particleCount, int width, int height);
     ~SimulationGPU();
 
-    void initialize() override;
-    void update(float dt) override;
+    void initialize();
+    void update(float dt);
 
-    // GPU-based: potremmo restituire un vettore vuoto in getParticles()
-    // se non vogliamo scaricare i dati su CPU.
-    const std::vector<Particle> &getParticles() const override
-    {
-        // Non carichiamo nulla su CPU
-        static std::vector<Particle> dummy;
-        return dummy;
-    }
+    // Accesso al buffer delle particelle (per eventuale debug drawing)
+    GLuint getParticleBuffer() const { return m_particleBuffers[m_currentBuffer]; }
+    int    getParticleCount() const  { return m_particleCount; }
 
-    int getParticleCount() const override
-    {
-        return m_particleCount;
-    }
-    
-public:
-    GLuint getParticleBufferID() const
-    {
-        return m_particleBuffer; // dove m_particleBuffer e' la SSBO/VBO
-    }
+    // Restituisce la texture finale (dopo l'ultimo pass). 
+    // Se stai facendo ping-pong, potrebbe essere textureIn dopo lo swap.
+    GLuint getFinalTexture() const { return m_textureIDIn; }
 
 private:
-    void createComputeShader(const std::string &compPath);
+    void createComputeShaders();
+    void createTextures();
+    void initializeParticles();
 
-    // Parametri
-    int m_particleCount;
-    int m_width, m_height;
+private:
+    int   m_particleCount;
+    int   m_width;
+    int   m_height;
+    bool  m_initialized;
 
-    // handle per computeShader e buffer
-    GLuint m_computeShaderID;
-    GLuint m_programID;
+    // Buffer particelle in double buffering
+    GLuint m_particleBuffers[2];
+    int    m_currentBuffer;
 
-    // SSBO o VBO per le particelle
-    GLuint m_particleBuffer;
+    // Due texture per ping-pong
+    GLuint m_textureIDIn;
+    GLuint m_textureIDOut;
 
-    bool m_initialized;
+    // Shader compute
+    GLuint m_updateProgramID;
+    GLuint m_blurProgramID;
 
-    // eventuali funzioni private
+    // Parametri di simulazione (esempio)
+    float m_sensorDistance;
+    float m_sensorAngle;
+    float m_turnAngle;
+    float m_speed;
+    float m_randomWeight;
 };

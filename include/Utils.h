@@ -63,8 +63,4 @@ namespace Utils
     // Funzioni per inizializzare GLAD e configurare OpenGL
     bool initializeGLAD();
     void configureOpenGL();
-
-    // Se vuoi funzioni extra: clearing screen, debug callback, ecc.
-    // void clearScreen();
-    // void enableDebugCallback();
 }
