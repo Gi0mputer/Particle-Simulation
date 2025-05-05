@@ -16,7 +16,7 @@ public:
     ~SimulationGPU();
 
     void initialize();
-    void update(float dt, double mouseX, double mouseY, int mouseState);
+    void update(float dt);
 
     // Accesso al buffer delle particelle (per eventuale debug drawing)
     GLuint getParticleBuffer() const { return m_particleBuffers[m_currentBuffer]; }
@@ -30,7 +30,6 @@ private:
     void createComputeShaders();
     void createTextures();
     void initializeParticles();
-    void initializeParameters();
 
 private:
     int   m_particleCount;
@@ -50,7 +49,7 @@ private:
     GLuint m_updateProgramID;
     GLuint m_blurProgramID;
 
-    // Parametri di simulazione
+    // Parametri di simulazione (esempio)
     float m_sensorDistance;
     float m_sensorAngle;
     float m_turnAngle;

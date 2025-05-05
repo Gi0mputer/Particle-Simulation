@@ -2,47 +2,36 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-// Input e output textures
-layout(binding = 0, rgba8) uniform readonly image2D inImage;
-layout(binding = 1, rgba8) uniform writeonly image2D outImage;
+// Input: binding=0, readonly
+layout(rgba8, binding=0) uniform readonly image2D inImage;
+// Output: binding=1, writeonly
+layout(rgba8, binding=1) uniform writeonly image2D outImage;
 
-// Dimensione texture
+// Dimensione
 uniform ivec2 uImageSize;
-uniform int uFrameCount;
 
+// (Opzionale) fade
+uniform float uFade;
 
 void main()
 {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
-    if (gid.x >= uImageSize.x || gid.y >= uImageSize.y) return;
+    if (gid.x>=uImageSize.x || gid.y>=uImageSize.y) return;
 
-    // Kernel di blur (monodimensionale, perché GLSL non supporta float[3][3] ovunque)
-    float kernel[9] = float[9](1.0, 1.0, 1.0,
-                                1.0, 10.0, 1.0,  // Il centro ha più peso
-                                1.0, 1.0, 1.0);
-    float totalWeight = 18.0;
-
-    // Somma dei pixel
-    vec4 sum = vec4(0.0);
-    
-    int index = 0;
-    for (int j = -1; j <= 1; j++) {
-        for (int i = -1; i <= 1; i++) {
-            ivec2 coord = gid + ivec2(i, j);
-            coord = clamp(coord, ivec2(0), uImageSize - ivec2(1, 1)); // Clamping ai bordi
-            sum += imageLoad(inImage, coord) * kernel[index]; // Applica peso
-            index++;
+    // Box blur 3x3
+    vec4 sum=vec4(0.0);
+    for (int j=-1; j<=1; j++){
+        for (int i=-1; i<=1; i++){
+            ivec2 coord=gid+ivec2(i,j);
+            coord=clamp(coord, ivec2(0), uImageSize-ivec2(1,1));
+            sum += imageLoad(inImage, coord);
         }
     }
+    vec4 blurred = sum/9.0;
 
-    // Normalizziamo il blur
-    vec4 blurred = sum / totalWeight;
+    // fade
+    // se uFade<1.0, riduciamo intensità
+    blurred *= uFade;
 
-
-
-    blurred = blurred - vec4(1.0);
-
-
-    // Scriviamo l'output
     imageStore(outImage, gid, blurred);
 }
