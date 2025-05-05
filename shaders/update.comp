@@ -2,77 +2,201 @@
 
 layout(local_size_x = 128) in;
 
-// Struttura parallela a GpuParticle (CPU)
 struct Particle {
-    vec2 position;
+    vec2  position;
     float angle;
     float speed;
+    // Possibile: int colorIndex; // se vuoi indice colore per ogni particella
 };
 
 // SSBO di input
-layout(std430, binding = 0) readonly buffer InParticles {
+layout(std430, binding = 0) buffer InParticles {
     Particle particles[];
 } inParticles;
 
 // SSBO di output
-layout(std430, binding = 1) writeonly buffer OutParticles {
+layout(std430, binding = 1) buffer OutParticles {
     Particle particles[];
 } outParticles;
 
-// Texture RGBA8: depositiamo colore
-// Notare "rgba8" e i qualificatori "readonly"/"writeonly"
-layout(rgba8, binding = 2) uniform image2D outImage;
+// Texture dove depositiamo (e da cui leggiamo)
+layout(binding = 2) uniform image2D inImage;
+layout(binding = 3) uniform image2D outImage;
 
-// Uniform
-uniform int   uParticleCount;
-uniform float uDt;
-uniform vec2  uSimSize;  // dimensioni (width, height)
 
-// Esempio parametri
-uniform float uSensorDistance; // non lo useremo nel minimal
-uniform float uRandomWeight;   // per noise eventuale
+// Uniform come da te specificato
+uniform int   uParticleCount;    
+uniform float uDt;               
+uniform vec2  uSimSize;          
+uniform int   uMouseStat;        
+uniform vec2  uMousePos;         
+uniform float uMouseAttraction;  
+uniform float uMouseRadius;      
+uniform float uRandomWeight;     
+uniform float uIncrement;        // analogo a INCREMENT
 
-// Semplice rand
+//-----------------------------------------------------
+// Parametri per il Physarum: sensori e turnAngle
+//-----------------------------------------------------
+uniform float uSensorDistance;  // Distanza di campionamento
+uniform float uSensorAngle;     // offset per i sensori laterali
+uniform float uTurnAngle;       // angolo di rotazione se i sensori differiscono
+
+//-----------------------------------------------------
+// Parametri per i "colori multipli" 
+// (Se vuoi che ogni particella abbia un colore differente a seconda dell'indice).
+// Se non usi colorIndex in Particle, puoi generare un colore basato su 'idx' in modo deterministico.      
+//-----------------------------------------------------
+
+// Funzione pseudo-random
 float rand(vec2 co) {
     return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453);
 }
 
+// HSV->RGB (come prima)
+vec3 hsvToRgb(float h, float s, float v){
+    float c = v*s;
+    float x = c*(1.0 - abs(mod(h*6.0,2.0)-1.0));
+    float m = v-c;
+
+    vec3 rgb;
+    if      (h<1.0/6.0) rgb = vec3(c,x,0);
+    else if(h<2.0/6.0)  rgb = vec3(x,c,0);
+    else if(h<3.0/6.0)  rgb = vec3(0,c,x);
+    else if(h<4.0/6.0)  rgb = vec3(0,x,c);
+    else if(h<5.0/6.0)  rgb = vec3(x,0,c);
+    else                rgb = vec3(c,0,x);
+
+    return rgb+m;
+}
+
+// Legge il colore dalla texture (inImage).
+// Ora restituiamo la luminanza (o un'altra funzione di r,g,b) invece di .r soltanto.
+float sampleTrail(ivec2 coord) {
+    // clamp ai bordi
+    coord = clamp(coord, ivec2(0), ivec2(uSimSize) - ivec2(1));
+    
+    // Leggiamo TUTTO il colore dalla inImage
+    vec4 color = imageLoad(inImage, coord);
+
+    // A questo punto, decidi come "misurare" il valore da usare per il sensore.
+    // Ad esempio puoi calcolare una luminanza classica:
+    float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    return lum;
+}
+
+
 void main()
 {
     uint idx = gl_GlobalInvocationID.x;
-    if (idx >= uint(uParticleCount)) return;
+    if(idx >= uint(uParticleCount)) return;
 
-    // Leggiamo la particella dal SSBO in
+    //-------------------------------------------------------
+    // Leggiamo la particella
+    //-------------------------------------------------------
     Particle p = inParticles.particles[idx];
 
-    // Aggiorno la posizione con speed e angle
+    // 1) Update base: pos + mouse
     vec2 dir = vec2(cos(p.angle), sin(p.angle));
     p.position += dir * p.speed * uDt;
 
+    if(uMouseStat == 1){
+        vec2 toMouse = uMousePos - p.position;
+        float dist = length(toMouse);
+        if(dist < uMouseRadius){
+            vec2 dirN = normalize(toMouse);
+            float force = uMouseAttraction*(1.0 - dist/uMouseRadius);
+            p.position += dirN*force*uDt;
+        }
+    }
+
     // Wrap-around
-    if (p.position.x < 0.0)        p.position.x += uSimSize.x;
-    else if (p.position.x>=uSimSize.x) p.position.x -= uSimSize.x;
+    if(p.position.x<0.0)           p.position.x+=uSimSize.x;
+    else if(p.position.x>=uSimSize.x) p.position.x-=uSimSize.x;
+    if(p.position.y<0.0)           p.position.y+=uSimSize.y;
+    else if(p.position.y>=uSimSize.y) p.position.y-=uSimSize.y;
 
-    if (p.position.y < 0.0)        p.position.y += uSimSize.y;
-    else if (p.position.y>=uSimSize.y) p.position.y -= uSimSize.y;
+    // 2) Sensor logic (physarum style)
+    // Campioniamo intorno alla particella
+    //    - center
+    //    - left
+    //    - right
+    vec2 centerPos = p.position + dir*uSensorDistance;
+    vec2 leftPos   = p.position + vec2(cos(p.angle+uSensorAngle), sin(p.angle+uSensorAngle))*uSensorDistance;
+    vec2 rightPos  = p.position + vec2(cos(p.angle-uSensorAngle), sin(p.angle-uSensorAngle))*uSensorDistance;
 
-    // (Opzionale) piccola variazione di angle
-    float noiseVal = (rand(p.position + vec2(idx,idx)) - 0.5) * uRandomWeight;
-    p.angle += noiseVal;
+    // mod e clamp
+    centerPos = mod(centerPos + uSimSize, uSimSize);
+    leftPos   = mod(leftPos + uSimSize, uSimSize);
+    rightPos  = mod(rightPos + uSimSize, uSimSize);
 
-    // Deposito colore (es. bianco) sulla texture in pos
-    ivec2 pixelCoord = ivec2(p.position);
-    // Clamping a sicurezza
-    pixelCoord = clamp(pixelCoord, ivec2(0), ivec2(uSimSize)-ivec2(1,1));
+    ivec2 cC = ivec2(centerPos);
+    ivec2 cL = ivec2(leftPos);
+    ivec2 cR = ivec2(rightPos);
 
-    // Leggiamo, accumuliamo e scriviamo. Ad es. potremmo fare
-    vec4 oldColor = imageLoad(outImage, pixelCoord);
-    // Accumulo
-    vec4 newColor = oldColor + vec4(0.1,0.1,0.1,1.0); // intensifichiamo canale rgb
-    newColor = clamp(newColor, 0.0, 1.0);
+    float valC = sampleTrail(cC);
+    float valL = sampleTrail(cL);
+    float valR = sampleTrail(cR);
 
-    imageStore(outImage, pixelCoord, newColor);
+    // se center < left e center < right => random turn
+    // se left > right => turn left
+    // else => turn right
+    if(valC<valL && valC<valR){
+        if(rand(p.position+vec2(idx))<0.5) p.angle-=uTurnAngle;
+        else                               p.angle+=uTurnAngle;
+    }
+    else if(valL>valR){
+        p.angle-=uTurnAngle;
+    }
+    else if(valR>valL){
+        p.angle+=uTurnAngle;
+    }
 
-    // Scriviamo la particella su outParticles
+    // Rumore
+    //p.angle += (rand(p.position+vec2(idx))-0.5)*uRandomWeight;
+
+    //-------------------------------------------------------
+    // 3) Deposito colore
+    //-------------------------------------------------------
+    ivec2 pixCoord = ivec2(p.position);
+    pixCoord = clamp(pixCoord, ivec2(0), ivec2(uSimSize)-ivec2(1));
+
+    vec4 oldColor = imageLoad(outImage, pixCoord);
+
+
+    // Intervallo di velocità [minSpeed, maxSpeed], 
+    // deve coincidere più o meno con la generazione che hai impostato in initializeParticles()
+    float minSpeed = 10.0;
+    float maxSpeed = 100.0;
+
+    // Normalizzo la velocità della particella in [0..1]
+    float speedFactor = clamp((p.speed - minSpeed) / (maxSpeed - minSpeed), 0.0, 1.0);
+
+    // hue da 0 (rosso) a 1/6 (giallo)
+    float hue = mix(0.0, 1.0/6.0, speedFactor); 
+
+    float sat = 1.0;  
+    float val = 1.0;  // se vuoi un colore "pieno"
+
+    // Esempio: colore basato su "idx" => ogni particella un colore differente
+    // calcoliamo hue in [0..1] come fract(idx * 0.043) => pattern
+    //float hue = fract(float(idx)*0.043 + uIncrement*0.001);
+    // float sat = 1.0; 
+    // float val = 0.8;
+
+    // Oppure potremmo mescolare con "valC" etc. 
+    // Se preferisci prendere spunto dal "grayVal" come nel tuo codice, puoi farlo.
+    vec3 depositRGB = hsvToRgb(hue, sat, val);
+
+    // Accumulo sul canale
+    // oldColor.rgb + depositRGB*0.2 => step
+    vec3 newRGB = oldColor.rgb + depositRGB*0.2; 
+    newRGB = clamp(newRGB, 0.0, 1.0);
+
+    imageStore(outImage, pixCoord, vec4(newRGB, 1.0));
+
+    //-------------------------------------------------------
+    // 4) Riscriviamo la particella
+    //-------------------------------------------------------
     outParticles.particles[idx] = p;
 }

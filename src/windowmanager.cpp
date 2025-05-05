@@ -2,13 +2,17 @@
 #include <iostream>
 #include <stdexcept> // Per std::runtime_error
 
-WindowManager::WindowManager(const char* title) : isFullscreen(false) {
+WindowManager::WindowManager(const std::string& title) : isFullscreen(false) {
+    std::cout << "[WindowManager] Inizializzazione..." << std::endl;
+    
     if (!glfwInit()) {
-        throw std::runtime_error("Errore nell'inizializzazione di GLFW!");
+        std::cout << "[WindowManager] ERRORE: Impossibile inizializzare GLFW" << std::endl;
+        throw std::runtime_error("Impossibile inizializzare GLFW");
     }
 
+    std::cout << "[WindowManager] Configurazione finestra..." << std::endl;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     monitor = glfwGetPrimaryMonitor();
@@ -20,12 +24,15 @@ WindowManager::WindowManager(const char* title) : isFullscreen(false) {
     windowedX = mode->width / 4;  // Posizione centrale
     windowedY = mode->height / 4;
 
-    window = glfwCreateWindow(windowedWidth, windowedHeight, title, nullptr, nullptr);
+    std::cout << "[WindowManager] Creazione finestra..." << std::endl;
+    window = glfwCreateWindow(windowedWidth, windowedHeight, title.c_str(), nullptr, nullptr);
     if (!window) {
+        std::cout << "[WindowManager] ERRORE: Impossibile creare la finestra" << std::endl;
         glfwTerminate();
-        throw std::runtime_error("Errore nella creazione della finestra!");
+        throw std::runtime_error("Impossibile creare la finestra");
     }
 
+    std::cout << "[WindowManager] Impostazione contesto OpenGL..." << std::endl;
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
@@ -34,11 +41,15 @@ WindowManager::WindowManager(const char* title) : isFullscreen(false) {
 
     // Associa l'oggetto WindowManager alla finestra
     glfwSetWindowUserPointer(window, this);
+
+    std::cout << "[WindowManager] Inizializzazione completata" << std::endl;
 }
 
 WindowManager::~WindowManager() {
+    std::cout << "[WindowManager] Pulizia risorse..." << std::endl;
     glfwDestroyWindow(window);
     glfwTerminate();
+    std::cout << "[WindowManager] Risorse pulite" << std::endl;
 }
 
 GLFWwindow* WindowManager::getWindow() const {
@@ -68,7 +79,7 @@ void WindowManager::swapBuffers() {
 }
 
 void WindowManager::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
-
+    std::cout << "[WindowManager] Ridimensionamento finestra: " << width << "x" << height << std::endl;
     glViewport(0, 0, width, height);
 
     WindowManager* wm = static_cast<WindowManager*>(glfwGetWindowUserPointer(window));

@@ -20,34 +20,86 @@ Shader::~Shader()
 
 void Shader::load(const std::string& vertexPath, const std::string& fragmentPath)
 {
-    // Legge i sorgenti dai file
-    std::string vertexCode   = readFile(vertexPath);
-    std::string fragmentCode = readFile(fragmentPath);
-
-    // Compila i due shader
-    GLuint vertID = compileShader(vertexCode,   GL_VERTEX_SHADER);
-    GLuint fragID = compileShader(fragmentCode, GL_FRAGMENT_SHADER);
-
-    // Crea e linka il program
+    std::cout << "[Shader] Caricamento shader vertex e fragment: " << vertexPath << ", " << fragmentPath << std::endl;
+    
+    std::string vertexCode;
+    std::string fragmentCode;
+    std::ifstream vShaderFile;
+    std::ifstream fShaderFile;
+    
+    vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
+    {
+        vShaderFile.open(vertexPath);
+        fShaderFile.open(fragmentPath);
+        std::stringstream vShaderStream, fShaderStream;
+        vShaderStream << vShaderFile.rdbuf();
+        fShaderStream << fShaderFile.rdbuf();
+        vShaderFile.close();
+        fShaderFile.close();
+        vertexCode = vShaderStream.str();
+        fragmentCode = fShaderStream.str();
+    }
+    catch (std::ifstream::failure& e)
+    {
+        std::cout << "[Shader] ERRORE: Impossibile leggere i file shader" << std::endl;
+        throw std::runtime_error("Impossibile leggere i file shader");
+    }
+    
+    const char* vShaderCode = vertexCode.c_str();
+    const char* fShaderCode = fragmentCode.c_str();
+    
+    // Compile shaders
+    unsigned int vertex, fragment;
+    int success;
+    char infoLog[512];
+    
+    // Vertex Shader
+    vertex = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex, 1, &vShaderCode, NULL);
+    glCompileShader(vertex);
+    
+    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        glGetShaderInfoLog(vertex, 512, NULL, infoLog);
+        std::cout << "[Shader] ERRORE: Compilazione vertex shader fallita\n" << infoLog << std::endl;
+        throw std::runtime_error("Compilazione vertex shader fallita");
+    }
+    
+    // Fragment Shader
+    fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment, 1, &fShaderCode, NULL);
+    glCompileShader(fragment);
+    
+    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        glGetShaderInfoLog(fragment, 512, NULL, infoLog);
+        std::cout << "[Shader] ERRORE: Compilazione fragment shader fallita\n" << infoLog << std::endl;
+        throw std::runtime_error("Compilazione fragment shader fallita");
+    }
+    
+    // Shader Program
     m_programID = glCreateProgram();
-    glAttachShader(m_programID, vertID);
-    glAttachShader(m_programID, fragID);
+    glAttachShader(m_programID, vertex);
+    glAttachShader(m_programID, fragment);
     glLinkProgram(m_programID);
-
-    // Controlla errori di link
-    GLint success;
+    
     glGetProgramiv(m_programID, GL_LINK_STATUS, &success);
     if (!success)
     {
-        char infoLog[512];
-        glGetProgramInfoLog(m_programID, 512, nullptr, infoLog);
-        throw std::runtime_error(std::string("Shader Program link error:\n") + infoLog);
+        glGetProgramInfoLog(m_programID, 512, NULL, infoLog);
+        std::cout << "[Shader] ERRORE: Linking shader program fallito\n" << infoLog << std::endl;
+        throw std::runtime_error("Linking shader program fallito");
     }
-
-    // Ora possiamo eliminare gli shader intermedi
-    glDeleteShader(vertID);
-    glDeleteShader(fragID);
-
+    
+    glDeleteShader(vertex);
+    glDeleteShader(fragment);
+    
+    std::cout << "[Shader] Shader vertex e fragment caricati con successo" << std::endl;
+    
     m_isLoaded = true;
 }
 
