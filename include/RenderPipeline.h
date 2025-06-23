@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include "SimulationGPU.h"
 #include "Shader.h"
+#include <memory>
 
 class RenderPipeline
 {
@@ -17,11 +18,11 @@ private:
     int m_width, m_height;
     int m_outputWidth, m_outputHeight;
 
-    // VAO e VBO per il quad fullscreen
-    GLuint m_quadVAO, m_quadVBO;
+    // VAO, VBO ed EBO per il quad fullscreen
+    GLuint m_quadVAO, m_quadVBO, m_quadEBO;
 
     // Shader per il pass finale
-    Shader m_finalShader;
+    std::unique_ptr<Shader> m_finalShader;
 
     // Uniform location
     GLint m_particles_uSimSizeLoc;
@@ -29,6 +30,6 @@ private:
 
 private:
     void finalPass(const SimulationGPU& simulation);
-    void setupQuadVAO();
-    void renderQuad();
+    void createFullscreenQuad();
+    void render(GLuint textureID);
 };

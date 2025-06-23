@@ -276,13 +276,13 @@ void SimulationGPU::createParticleBuffers()
 {
     std::cout << "[SimulationGPU] Creazione buffer particelle..." << std::endl;
     
-    glGenBuffers(1, &m_particleBufferIn);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBufferIn);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_numParticles * sizeof(Particle), nullptr, GL_DYNAMIC_DRAW);
-    
-    glGenBuffers(1, &m_particleBufferOut);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBufferOut);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, m_numParticles * sizeof(Particle), nullptr, GL_DYNAMIC_DRAW);
+    glGenBuffers(1, &m_particleBuffers[0]);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[0]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_particleCount * sizeof(GpuParticle), nullptr, GL_DYNAMIC_DRAW);
+
+    glGenBuffers(1, &m_particleBuffers[1]);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[1]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_particleCount * sizeof(GpuParticle), nullptr, GL_DYNAMIC_DRAW);
     
     std::cout << "[SimulationGPU] Buffer particelle creati con successo" << std::endl;
 }

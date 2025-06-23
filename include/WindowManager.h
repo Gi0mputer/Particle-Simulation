@@ -3,10 +3,11 @@
 // Librerie OpenGL e GLFW
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <string>
 
 class WindowManager {
 public:
-    WindowManager(const char* title);
+    WindowManager(const std::string& title);
     ~WindowManager();
 
     GLFWwindow* getWindow() const;

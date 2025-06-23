@@ -1,6 +1,7 @@
 #include "RenderPipeline.h"
 #include <stdexcept>
 #include <iostream>
+#include <memory>
 
 RenderPipeline::RenderPipeline(int width, int height)
     : m_width(width)
@@ -9,6 +10,7 @@ RenderPipeline::RenderPipeline(int width, int height)
     , m_outputHeight(height)
     , m_quadVAO(0)
     , m_quadVBO(0)
+    , m_quadEBO(0)
     , m_final_uTextureLoc(-1)
 {
 }
@@ -17,6 +19,7 @@ RenderPipeline::~RenderPipeline()
 {
     glDeleteVertexArrays(1, &m_quadVAO);
     glDeleteBuffers(1, &m_quadVBO);
+    glDeleteBuffers(1, &m_quadEBO);
 }
 
 void RenderPipeline::initialize()
@@ -25,6 +28,7 @@ void RenderPipeline::initialize()
     
     std::cout << "[RenderPipeline] Creazione shader..." << std::endl;
     m_finalShader = std::make_unique<Shader>("shaders/final.vert", "shaders/final.frag");
+    m_final_uTextureLoc = glGetUniformLocation(m_finalShader->getID(), "uTexture");
     
     std::cout << "[RenderPipeline] Creazione quad..." << std::endl;
     createFullscreenQuad();
@@ -92,9 +96,7 @@ void RenderPipeline::finalPass(const SimulationGPU& simulation)
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, finalTex);
-
-    if (m_final_uTextureLoc >= 0)
-        glUniform1i(m_final_uTextureLoc, 0);
+    m_finalShader->setInt("uTexture", 0);
 
     glBindVertexArray(m_quadVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -114,7 +116,7 @@ void RenderPipeline::render(GLuint textureID)
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, textureID);
-    m_finalShader->setInt("u_texture", 0);
+    m_finalShader->setInt("uTexture", 0);
     
     glBindVertexArray(m_quadVAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

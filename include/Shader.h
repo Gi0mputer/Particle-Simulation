@@ -14,6 +14,7 @@ public:
      * @brief Costruttore di default. Non carica immediatamente gli shader.
      */
     Shader();
+    Shader(const std::string& vertexPath, const std::string& fragmentPath);
 
     /**
      * @brief Distruttore: rilascia le risorse dello shader program.
@@ -35,6 +36,8 @@ public:
      * @brief Attiva (usa) questo shader program.
      */
     void use() const;
+
+    void setInt(const std::string& name, GLint value) const;
 
     /**
      * @brief Restituisce l'ID del program OpenGL (glCreateProgram).

@@ -10,6 +10,12 @@ Shader::Shader()
 {
 }
 
+Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath)
+    : Shader()
+{
+    load(vertexPath, fragmentPath);
+}
+
 Shader::~Shader()
 {
     if (m_isLoaded)
@@ -109,6 +115,13 @@ void Shader::use() const
     {
         glUseProgram(m_programID);
     }
+}
+
+void Shader::setInt(const std::string& name, GLint value) const
+{
+    GLint loc = glGetUniformLocation(m_programID, name.c_str());
+    if (loc >= 0)
+        glUniform1i(loc, value);
 }
 
 std::string Shader::readFile(const std::string& filePath)

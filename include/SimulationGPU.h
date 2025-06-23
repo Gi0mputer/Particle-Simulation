@@ -29,6 +29,7 @@ public:
 private:
     void createComputeShaders();
     void createTextures();
+    void createParticleBuffers();
     void initializeParticles();
     void initializeParameters();
 
