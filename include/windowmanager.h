@@ -1,5 +1,7 @@
 #pragma once
 
+// Librerie OpenGL e GLFW
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 class WindowManager {

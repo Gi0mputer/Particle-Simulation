@@ -1,4 +1,4 @@
-#include "windowmanager.h"
+#include "WindowManager.h"
 #include <iostream>
 #include <stdexcept> // Per std::runtime_error
 
