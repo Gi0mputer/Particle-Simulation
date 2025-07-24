@@ -1,27 +1,21 @@
 #version 450 core
 
-// If the extension for floating point atomics is available we use it,
-// otherwise we emulate a float atomic add using compare-and-swap on an
-// integer image. We switch the image type accordingly.
-#ifdef GL_ARB_shader_image_atomic
-    #extension GL_ARB_shader_image_atomic : enable
-    layout(r32f, binding = 2) uniform image2D uTrail;
-#else
-    layout(r32ui, binding = 2) uniform uimage2D uTrail;
+// The driver used for testing lacked float image atomics, so we always use an
+// integer image and emulate atomicAdd on floats with compare-and-swap.
+layout(r32ui, binding = 2) uniform uimage2D uTrail;
 
-    void atomicAddFloat(uimage2D img, ivec2 coord, float value)
-    {
-        uint old = imageLoad(img, coord).r;
-        while (true) {
-            float oldF = uintBitsToFloat(old);
-            float newF = oldF + value;
-            uint  newU = floatBitsToUint(newF);
-            uint  prev = imageAtomicCompSwap(img, coord, old, newU);
-            if (prev == old) break; // success
-            old = prev;
-        }
+void atomicAddFloat(uimage2D img, ivec2 coord, float value)
+{
+    uint old = imageLoad(img, coord).r;
+    while (true) {
+        float oldF = uintBitsToFloat(old);
+        float newF = oldF + value;
+        uint  newU = floatBitsToUint(newF);
+        uint  prev = imageAtomicCompSwap(img, coord, old, newU);
+        if (prev == old) break; // success
+        old = prev;
     }
-#endif
+}
 
 layout(local_size_x = 128) in;
 
@@ -61,17 +55,11 @@ void main(){
 
 #ifdef USE_PHYSARUM_SENSORS
     vec2 forward = p.position + dir * uSensorDistance;
-    vec2 leftDir = vec2(dir.y, -dir.x);
+    vec2 leftDir  = vec2(dir.y, -dir.x);
     vec2 rightDir = vec2(-dir.y, dir.x);
-    #ifdef GL_ARB_shader_image_atomic
-        float c = imageLoad(uTrail, ivec2(forward)).r;
-        float l = imageLoad(uTrail, ivec2(p.position + leftDir * uSensorDistance)).r;
-        float r = imageLoad(uTrail, ivec2(p.position + rightDir * uSensorDistance)).r;
-    #else
-        float c = uintBitsToFloat(imageLoad(uTrail, ivec2(forward)).r);
-        float l = uintBitsToFloat(imageLoad(uTrail, ivec2(p.position + leftDir * uSensorDistance)).r);
-        float r = uintBitsToFloat(imageLoad(uTrail, ivec2(p.position + rightDir * uSensorDistance)).r);
-    #endif
+    float c = uintBitsToFloat(imageLoad(uTrail, ivec2(forward)).r);
+    float l = uintBitsToFloat(imageLoad(uTrail, ivec2(p.position + leftDir * uSensorDistance)).r);
+    float r = uintBitsToFloat(imageLoad(uTrail, ivec2(p.position + rightDir * uSensorDistance)).r);
     p.angle += (l - r) * 0.25;
 #endif
 
@@ -79,11 +67,7 @@ void main(){
 
     ivec2 px = ivec2(p.position);
     px = clamp(px, ivec2(0), ivec2(uSimSize) - ivec2(1));
-#ifdef GL_ARB_shader_image_atomic
-    imageAtomicAdd(uTrail, px, 1.0);
-#else
     atomicAddFloat(uTrail, px, 1.0);
-#endif
 
     outParticles.particles[idx] = p;
 }
