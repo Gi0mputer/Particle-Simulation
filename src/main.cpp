@@ -47,14 +47,14 @@ static GLuint createComputeProgram(const char* path) {
     return prog;
 }
 
-static GLuint createTextureR32F(int w, int h){
+static GLuint createTextureR32UI(int w, int h){
     GLuint tex; glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, w, h);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R32UI, w, h);
     glBindTexture(GL_TEXTURE_2D, 0);
     return tex;
 }
@@ -85,8 +85,8 @@ int main(){
     GLint uTrailLoc = glGetUniformLocation(quadShader.getID(), "uTrail");
 
     GLuint trailTex[2];
-    trailTex[0] = createTextureR32F(SIM_WIDTH, SIM_HEIGHT);
-    trailTex[1] = createTextureR32F(SIM_WIDTH, SIM_HEIGHT);
+    trailTex[0] = createTextureR32UI(SIM_WIDTH, SIM_HEIGHT);
+    trailTex[1] = createTextureR32UI(SIM_WIDTH, SIM_HEIGHT);
     int currentTrail = 0;
 
     GLuint ssbo[2];
@@ -132,7 +132,7 @@ int main(){
         int nextSSBO = 1 - currentSSBO;
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[currentSSBO]);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo[nextSSBO]);
-        glBindImageTexture(2, trailTex[currentTrail], 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+        glBindImageTexture(2, trailTex[currentTrail], 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
         GLuint groups = (PARTICLES + 127) / 128;
         glDispatchCompute(groups, 1, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
@@ -141,7 +141,7 @@ int main(){
         glUseProgram(diffuseProg);
         glBindTextureUnit(0, trailTex[currentTrail]);
         int nextTrail = 1 - currentTrail;
-        glBindImageTexture(1, trailTex[nextTrail], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+        glBindImageTexture(1, trailTex[nextTrail], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32UI);
         glUniform1f(glGetUniformLocation(diffuseProg, "uDecay"), 0.98f);
         glUniform1f(glGetUniformLocation(diffuseProg, "uDiffuse"), 0.25f);
         glDispatchCompute((SIM_WIDTH+15)/16, (SIM_HEIGHT+15)/16, 1);
