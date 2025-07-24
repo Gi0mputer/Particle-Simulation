@@ -2,77 +2,55 @@
 
 layout(local_size_x = 128) in;
 
-// Struttura parallela a GpuParticle (CPU)
 struct Particle {
     vec2 position;
     float angle;
     float speed;
+    // Per 3D: vec3 position; vec3 direction;
 };
 
-// SSBO di input
-layout(std430, binding = 0) readonly buffer InParticles {
-    Particle particles[];
-} inParticles;
+layout(std430, binding = 0) readonly buffer InParticles { Particle particles[]; } inParticles;
+layout(std430, binding = 1) writeonly buffer OutParticles { Particle particles[]; } outParticles;
 
-// SSBO di output
-layout(std430, binding = 1) writeonly buffer OutParticles {
-    Particle particles[];
-} outParticles;
+layout(r32f, binding = 2) uniform image2D uTrail;
 
-// Texture RGBA8: depositiamo colore
-// Notare "rgba8" e i qualificatori "readonly"/"writeonly"
-layout(rgba8, binding = 2) uniform image2D outImage;
-
-// Uniform
 uniform int   uParticleCount;
 uniform float uDt;
-uniform vec2  uSimSize;  // dimensioni (width, height)
+uniform vec2  uSimSize;
+uniform float uSensorDistance;
+uniform float uRandomWeight;
 
-// Esempio parametri
-uniform float uSensorDistance; // non lo useremo nel minimal
-uniform float uRandomWeight;   // per noise eventuale
+float rand(vec2 co){ return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453); }
 
-// Semplice rand
-float rand(vec2 co) {
-    return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453);
-}
-
-void main()
-{
+void main(){
     uint idx = gl_GlobalInvocationID.x;
-    if (idx >= uint(uParticleCount)) return;
+    if(idx >= uint(uParticleCount)) return;
 
-    // Leggiamo la particella dal SSBO in
     Particle p = inParticles.particles[idx];
 
-    // Aggiorno la posizione con speed e angle
     vec2 dir = vec2(cos(p.angle), sin(p.angle));
     p.position += dir * p.speed * uDt;
 
-    // Wrap-around
-    if (p.position.x < 0.0)        p.position.x += uSimSize.x;
-    else if (p.position.x>=uSimSize.x) p.position.x -= uSimSize.x;
+    if(p.position.x < 0.0) p.position.x += uSimSize.x;
+    else if(p.position.x >= uSimSize.x) p.position.x -= uSimSize.x;
+    if(p.position.y < 0.0) p.position.y += uSimSize.y;
+    else if(p.position.y >= uSimSize.y) p.position.y -= uSimSize.y;
 
-    if (p.position.y < 0.0)        p.position.y += uSimSize.y;
-    else if (p.position.y>=uSimSize.y) p.position.y -= uSimSize.y;
+#ifdef USE_PHYSARUM_SENSORS
+    vec2 forward = p.position + dir * uSensorDistance;
+    vec2 leftDir = vec2(dir.y, -dir.x);
+    vec2 rightDir = vec2(-dir.y, dir.x);
+    float c = imageLoad(uTrail, ivec2(forward)).r;
+    float l = imageLoad(uTrail, ivec2(p.position + leftDir * uSensorDistance)).r;
+    float r = imageLoad(uTrail, ivec2(p.position + rightDir * uSensorDistance)).r;
+    p.angle += (l - r) * 0.25;
+#endif
 
-    // (Opzionale) piccola variazione di angle
-    float noiseVal = (rand(p.position + vec2(idx,idx)) - 0.5) * uRandomWeight;
-    p.angle += noiseVal;
+    p.angle += (rand(p.position) - 0.5) * uRandomWeight;
 
-    // Deposito colore (es. bianco) sulla texture in pos
-    ivec2 pixelCoord = ivec2(p.position);
-    // Clamping a sicurezza
-    pixelCoord = clamp(pixelCoord, ivec2(0), ivec2(uSimSize)-ivec2(1,1));
+    ivec2 px = ivec2(p.position);
+    px = clamp(px, ivec2(0), ivec2(uSimSize) - ivec2(1));
+    imageAtomicAdd(uTrail, px, 1.0);
 
-    // Leggiamo, accumuliamo e scriviamo. Ad es. potremmo fare
-    vec4 oldColor = imageLoad(outImage, pixelCoord);
-    // Accumulo
-    vec4 newColor = oldColor + vec4(0.1,0.1,0.1,1.0); // intensifichiamo canale rgb
-    newColor = clamp(newColor, 0.0, 1.0);
-
-    imageStore(outImage, pixelCoord, newColor);
-
-    // Scriviamo la particella su outParticles
     outParticles.particles[idx] = p;
 }

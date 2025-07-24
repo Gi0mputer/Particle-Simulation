@@ -1,0 +1,27 @@
+#version 450 core
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) uniform sampler2D uInput;
+layout(r32f, binding = 1) uniform writeonly image2D uOutput;
+
+uniform float uDecay;
+uniform float uDiffuse;
+
+void main(){
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = textureSize(uInput, 0);
+    if(pos.x >= size.x || pos.y >= size.y) return;
+
+    float center = texelFetch(uInput, pos, 0).r;
+    float up    = texelFetch(uInput, pos + ivec2(0,1), 0).r;
+    float down  = texelFetch(uInput, pos + ivec2(0,-1), 0).r;
+    float left  = texelFetch(uInput, pos + ivec2(-1,0), 0).r;
+    float right = texelFetch(uInput, pos + ivec2(1,0), 0).r;
+
+    float blur = (up + down + left + right) * 0.25;
+    float value = center * uDecay + blur * uDiffuse;
+    imageStore(uOutput, pos, vec4(value));
+}
+
+// Per 3D: usa sampler3D/image3D e considera i 6 vicini lungo Z, dispatch 3D.
