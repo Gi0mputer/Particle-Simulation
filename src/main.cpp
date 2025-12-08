@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <chrono>
 #include <string>
+#include <algorithm>
 
 // ImGui
 #include <imgui.h>
@@ -39,40 +40,140 @@ int main(int argc, char **argv)
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.IniFilename = nullptr; // Disable imgui.ini
         
-        // Custom Dark Style
+        // FONT SIZE - Much bigger!
+        io.FontGlobalScale = 1.6f;
+        
+        // Premium Dark Style
         ImGui::StyleColorsDark();
         ImGuiStyle& style = ImGui::GetStyle();
-        style.WindowRounding = 8.0f;
-        style.FrameRounding = 4.0f;
-        style.WindowBorderSize = 0.0f;
-        style.Alpha = 0.95f;
         
-        // Colors: Semi-transparent black background, white text
+        // Window styling
+        style.WindowRounding = 0.0f;
+        style.WindowBorderSize = 0.0f;
+        style.WindowPadding = ImVec2(20, 20);
+        style.WindowMinSize = ImVec2(400, 600);
+        
+        // Frame styling
+        style.FrameRounding = 6.0f;
+        style.FramePadding = ImVec2(12, 8);
+        style.FrameBorderSize = 0.0f;
+        
+        // Item styling
+        style.ItemSpacing = ImVec2(12, 10);
+        style.ItemInnerSpacing = ImVec2(8, 6);
+        style.IndentSpacing = 25.0f;
+        style.ScrollbarSize = 12.0f;
+        style.ScrollbarRounding = 9.0f;
+        style.GrabMinSize = 12.0f;
+        style.GrabRounding = 6.0f;
+        
+        // Tab styling
+        style.TabRounding = 6.0f;
+        
+        // Colors: Premium dark theme
         ImVec4* colors = style.Colors;
-        colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.85f);
-        colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.90f);
-        colors[ImGuiCol_Border] = ImVec4(0.3f, 0.3f, 0.3f, 0.5f);
-        colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-        colors[ImGuiCol_Header] = ImVec4(0.2f, 0.2f, 0.2f, 1.0f);
-        colors[ImGuiCol_HeaderHovered] = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
-        colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);
-        colors[ImGuiCol_Button] = ImVec4(0.25f, 0.25f, 0.25f, 1.0f);
-        colors[ImGuiCol_ButtonHovered] = ImVec4(0.35f, 0.35f, 0.35f, 1.0f);
-        colors[ImGuiCol_ButtonActive] = ImVec4(0.45f, 0.45f, 0.45f, 1.0f);
-        colors[ImGuiCol_SliderGrab] = ImVec4(0.6f, 0.6f, 0.6f, 1.0f);
-        colors[ImGuiCol_SliderGrabActive] = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+        colors[ImGuiCol_WindowBg] = ImVec4(0.10f, 0.10f, 0.12f, 0.95f);
+        colors[ImGuiCol_ChildBg] = ImVec4(0.12f, 0.12f, 0.14f, 1.00f);
+        colors[ImGuiCol_PopupBg] = ImVec4(0.10f, 0.10f, 0.12f, 0.95f);
+        colors[ImGuiCol_Border] = ImVec4(0.25f, 0.25f, 0.28f, 0.50f);
+        colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+        
+        // Text
+        colors[ImGuiCol_Text] = ImVec4(0.95f, 0.95f, 0.97f, 1.00f);
+        colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.52f, 1.00f);
+        
+        // Headers (TreeNode, CollapsingHeader)
+        colors[ImGuiCol_Header] = ImVec4(0.20f, 0.22f, 0.27f, 1.00f);
+        colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.28f, 0.35f, 1.00f);
+        colors[ImGuiCol_HeaderActive] = ImVec4(0.30f, 0.32f, 0.40f, 1.00f);
+        
+        // Buttons
+        colors[ImGuiCol_Button] = ImVec4(0.22f, 0.24f, 0.28f, 1.00f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.32f, 0.38f, 1.00f);
+        colors[ImGuiCol_ButtonActive] = ImVec4(0.35f, 0.37f, 0.45f, 1.00f);
+        
+        // Frame backgrounds
+        colors[ImGuiCol_FrameBg] = ImVec4(0.18f, 0.20f, 0.24f, 1.00f);
+        colors[ImGuiCol_FrameBgHovered] = ImVec4(0.24f, 0.26f, 0.32f, 1.00f);
+        colors[ImGuiCol_FrameBgActive] = ImVec4(0.28f, 0.30f, 0.36f, 1.00f);
+        
+        // Tabs
+        colors[ImGuiCol_Tab] = ImVec4(0.18f, 0.20f, 0.24f, 1.00f);
+        colors[ImGuiCol_TabHovered] = ImVec4(0.30f, 0.32f, 0.38f, 1.00f);
+        colors[ImGuiCol_TabActive] = ImVec4(0.24f, 0.26f, 0.32f, 1.00f);
+        
+        // Title
+        colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.14f, 0.18f, 1.00f);
+        colors[ImGuiCol_TitleBgActive] = ImVec4(0.14f, 0.16f, 0.22f, 1.00f);
+        colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.12f, 0.14f, 0.18f, 0.75f);
+        
+        // Scrollbar
+        colors[ImGuiCol_ScrollbarBg] = ImVec4(0.12f, 0.14f, 0.18f, 0.50f);
+        colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.28f, 0.30f, 0.36f, 1.00f);
+        colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.35f, 0.37f, 0.45f, 1.00f);
+        colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.40f, 0.42f, 0.52f, 1.00f);
+        
+        // Slider/Check/Radio
+        colors[ImGuiCol_CheckMark] = ImVec4(0.70f, 0.72f, 0.80f, 1.00f);
+        colors[ImGuiCol_SliderGrab] = ImVec4(0.60f, 0.62f, 0.70f, 1.00f);
+        colors[ImGuiCol_SliderGrabActive] = ImVec4(0.75f, 0.77f, 0.85f, 1.00f);
+        
+        // Separator
+        colors[ImGuiCol_Separator] = ImVec4(0.25f, 0.25f, 0.28f, 0.50f);
+        colors[ImGuiCol_SeparatorHovered] = ImVec4(0.35f, 0.35f, 0.40f, 0.75f);
+        colors[ImGuiCol_SeparatorActive] = ImVec4(0.45f, 0.45f, 0.52f, 1.00f);
         
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init("#version 450");
 
         //// 3. SIMULATION
         int simWidth, simHeight;
-        Utils::SimulationManager::getSimulationSize(Utils::SimulationResolution::HD_720, simWidth, simHeight);
-        std::cout << "[Simulation] Fixed Size: " << simWidth << " x " << simHeight << std::endl;
+        Utils::SimulationManager::getSimulationSize(Utils::SimulationResolution::FHD_1080, simWidth, simHeight);
+        std::cout << "[Simulation] 1080p Resolution: " << simWidth << " x " << simHeight << std::endl;
+
+        // Simulation Parameters (UI state)
+        struct SimulationParams {
+            // Physarum
+            bool physarumEnabled = false;
+            float physarumIntensity = 1.0f;
+            float sensorDistance = 20.0f;
+            float sensorAngle = 0.785f;
+            float turnAngle = 0.785f;
+            float speed = 100.0f;
+
+            // Colors
+            float color1[3] = {0.0f, 1.0f, 1.0f};
+            float color2[3] = {1.0f, 0.0f, 1.0f};
+            
+            // Boids
+            bool boidsEnabled = false;
+            float alignment = 1.0f;
+            float separation = 1.2f;
+            float cohesion = 1.0f;
+            float radius = 50.0f;
+            
+            // Collisions
+            bool collisionsEnabled = false;
+            float collisionRadius = 40.0f;
+            
+            // Boundaries
+            int boundaryMode = 0;
+
+            // Mouse
+            int mouseMode = 0;
+            
+            // Particles
+            int targetParticleCount = 1000000;
+        } params;
         
-        SimulationGPU simulation(1000000, simWidth, simHeight);
+        constexpr int maxParticles = 5000000;
+        const int initialParticles = 1000000;
+        SimulationGPU simulation(maxParticles, simWidth, simHeight);
         simulation.initialize();
+        simulation.setActiveParticleCount(initialParticles);
+        params.targetParticleCount = initialParticles;
 
         //// 4. RENDER PIPELINE
         RenderPipeline renderPipeline(simWidth, simHeight);
@@ -85,34 +186,6 @@ int main(int argc, char **argv)
 
         // UI State
         bool showMenu = false;
-        
-        // Simulation Parameters
-        struct SimulationParams {
-            // Physarum
-            bool physarumEnabled = true;
-            float physarumIntensity = 1.0f;
-            float sensorDistance = 20.0f;
-            float sensorAngle = 0.785f; // 45 deg
-            float turnAngle = 0.785f;
-            float speed = 100.0f;
-            int color1Behavior = 0; // 0=Attract, 1=Repel
-            int color2Behavior = 0;
-            
-            // Collisions
-            bool collisionsEnabled = false;
-            
-            // Boids
-            bool boidsEnabled = false;
-            float alignmentWeight = 1.0f;
-            float separationWeight = 1.5f;
-            float cohesionWeight = 1.0f;
-            
-            // Mouse
-            int mouseMode = 0; // 0=Attract, 1=Repel, 2=Ring, 3=Vortex
-            
-            // Particles
-            int targetParticleCount = 1000000;
-        } params;
 
         //// 6. MAIN LOOP
         while (!windowManager.shouldClose())
@@ -124,143 +197,266 @@ int main(int argc, char **argv)
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            // --- HAMBURGER MENU (Top-Right Corner) ---
+            // --- HAMBURGER MENU BUTTON (Only visible when menu is CLOSED) ---
+            if (!showMenu)
             {
-                ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | 
-                                                 ImGuiWindowFlags_NoMove | 
-                                                 ImGuiWindowFlags_NoResize | 
-                                                 ImGuiWindowFlags_NoSavedSettings |
-                                                 ImGuiWindowFlags_AlwaysAutoResize;
+                ImGuiWindowFlags btn_flags = ImGuiWindowFlags_NoDecoration | 
+                                             ImGuiWindowFlags_NoMove | 
+                                             ImGuiWindowFlags_NoResize | 
+                                             ImGuiWindowFlags_NoSavedSettings |
+                                             ImGuiWindowFlags_AlwaysAutoResize |
+                                             ImGuiWindowFlags_NoBackground;
                 
-                const float DISTANCE = 10.0f;
                 ImVec2 work_pos = ImGui::GetMainViewport()->WorkPos;
                 ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
-                ImVec2 window_pos = ImVec2(work_pos.x + work_size.x - DISTANCE, work_pos.y + DISTANCE);
-                ImVec2 window_pos_pivot = ImVec2(1.0f, 0.0f);
-                ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-                ImGui::SetNextWindowBgAlpha(0.85f);
+                ImVec2 btn_pos = ImVec2(work_pos.x + work_size.x - 100, work_pos.y + 15);
+                ImGui::SetNextWindowPos(btn_pos, ImGuiCond_Always);
 
-                if (ImGui::Begin("##HamburgerButton", nullptr, window_flags))
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 10));
+                if (ImGui::Begin("##MenuButton", nullptr, btn_flags))
                 {
-                    if (ImGui::Button(showMenu ? "X" : ":::"))
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 0.9f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.25f, 0.25f, 0.30f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.30f, 0.38f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.95f, 0.97f, 1.0f));
+                    
+                    if (ImGui::Button(" MENU ", ImVec2(80, 50)))
                     {
-                        showMenu = !showMenu;
+                        showMenu = true;
                     }
+                    
+                    ImGui::PopStyleColor(4);
                 }
                 ImGui::End();
+                ImGui::PopStyleVar();
             }
 
-            // --- MAIN SETTINGS PANEL ---
+            // --- MAIN SETTINGS PANEL (Full Height, Right-Aligned) ---
             if (showMenu)
             {
                 ImGuiWindowFlags menu_flags = ImGuiWindowFlags_NoMove | 
                                               ImGuiWindowFlags_NoResize | 
-                                              ImGuiWindowFlags_AlwaysAutoResize;
+                                              ImGuiWindowFlags_NoCollapse |
+                                              ImGuiWindowFlags_NoTitleBar |
+                                              ImGuiWindowFlags_NoScrollbar;
                 
-                const float DISTANCE = 10.0f;
                 ImVec2 work_pos = ImGui::GetMainViewport()->WorkPos;
                 ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
-                ImVec2 menu_pos = ImVec2(work_pos.x + work_size.x - DISTANCE, work_pos.y + 50.0f);
-                ImVec2 menu_pivot = ImVec2(1.0f, 0.0f);
-                ImGui::SetNextWindowPos(menu_pos, ImGuiCond_Always, menu_pivot);
-                ImGui::SetNextWindowSize(ImVec2(350, 0), ImGuiCond_Always);
-                ImGui::SetNextWindowBgAlpha(0.85f);
+                
+                float menuWidth = 650.0f;  // Increased from 450 to 650
+                float menuHeight = work_size.y;
+                
+                ImVec2 menu_pos = ImVec2(work_pos.x + work_size.x - menuWidth, work_pos.y);
+                ImGui::SetNextWindowPos(menu_pos, ImGuiCond_Always);
+                ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_Always);
+                ImGui::SetNextWindowBgAlpha(0.96f);
 
-                if (ImGui::Begin("Settings Menu", &showMenu, menu_flags))
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(25, 25));
+                if (ImGui::Begin("Settings", nullptr, menu_flags))
                 {
-                    ImGui::Text("FPS: %.1f (%.2f ms)", io.Framerate, 1000.0f / io.Framerate);
+                    // Close button (top right inside menu)
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.15f, 0.15f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.25f, 0.25f, 1.0f));
+                    
+                    float buttonWidth = 60.0f;
+                    ImGui::SetCursorPosX(menuWidth - buttonWidth - 25);
+                    if (ImGui::Button(" X ", ImVec2(buttonWidth, 40)))
+                    {
+                        showMenu = false;
+                    }
+                    ImGui::PopStyleColor(3);
+                    
+                    ImGui::Spacing();
+                    
+                    // Title
+                    ImGui::PushFont(nullptr);
+                    ImGui::TextColored(ImVec4(0.85f, 0.87f, 0.92f, 1.0f), "PARTICLE SIMULATION");
+                    ImGui::PopFont();
+                    
+                    ImGui::Spacing();
+                    ImGui::TextColored(ImVec4(0.60f, 0.65f, 0.72f, 1.0f), "FPS: %.1f  |  %.2f ms", io.Framerate, 1000.0f / io.Framerate);
+                    ImGui::Spacing();
                     ImGui::Separator();
+                    ImGui::Spacing();
+                    
+                    // Begin scrollable child region for content
+                    ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
                     // ========== SIMULATIONS ==========
-                    if (ImGui::CollapsingHeader("Simulazioni", ImGuiTreeNodeFlags_DefaultOpen))
+                    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.22f, 0.24f, 0.30f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.28f, 0.30f, 0.38f, 1.0f));
+                    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.32f, 0.34f, 0.42f, 1.0f));
+                    
+                    if (ImGui::CollapsingHeader("[ SIMULATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
+                        ImGui::Indent(10);
+                        
                         // --- Physarum ---
-                        if (ImGui::TreeNode("Physarum"))
+                        if (ImGui::TreeNodeEx("Physarum", ImGuiTreeNodeFlags_DefaultOpen))
                         {
-                            ImGui::Checkbox("Attiva sulle particelle##physarum", &params.physarumEnabled);
+                            ImGui::Spacing();
+                            ImGui::Checkbox("Active on particles", &params.physarumEnabled);
                             
                             if (params.physarumEnabled) {
-                                ImGui::SliderFloat("Intensita Forza", &params.physarumIntensity, 0.0f, 5.0f);
-                                ImGui::SliderFloat("Distanza Sensori", &params.sensorDistance, 5.0f, 50.0f);
-                                ImGui::SliderFloat("Ampiezza Sensori (deg)", &params.sensorAngle, 0.1f, 1.57f);
-                                ImGui::SliderFloat("Angolo Rotazione", &params.turnAngle, 0.1f, 1.57f);
-                                ImGui::SliderFloat("Velocita", &params.speed, 10.0f, 300.0f);
+                                ImGui::Spacing();
+                                ImGui::SliderFloat("Force Intensity", &params.physarumIntensity, 0.0f, 5.0f, "%.2f");
+                                ImGui::SliderFloat("Sensor Distance", &params.sensorDistance, 5.0f, 50.0f, "%.1f px");
                                 
-                                ImGui::Text("Colore 1:");
-                                ImGui::RadioButton("Attrae##c1", &params.color1Behavior, 0); ImGui::SameLine();
-                                ImGui::RadioButton("Respinge##c1", &params.color1Behavior, 1);
+                                float sensorDeg = params.sensorAngle * 57.2958f;
+                                if (ImGui::SliderFloat("Sensor Angle", &sensorDeg, 5.0f, 90.0f, "%.1f deg")) {
+                                    params.sensorAngle = sensorDeg / 57.2958f;
+                                }
                                 
-                                ImGui::Text("Colore 2:");
-                                ImGui::RadioButton("Attrae##c2", &params.color2Behavior, 0); ImGui::SameLine();
-                                ImGui::RadioButton("Respinge##c2", &params.color2Behavior, 1);
+                                float turnDeg = params.turnAngle * 57.2958f;
+                                if (ImGui::SliderFloat("Turn Angle", &turnDeg, 5.0f, 90.0f, "%.1f deg")) {
+                                    params.turnAngle = turnDeg / 57.2958f;
+                                }
+                                
+                                ImGui::SliderFloat("Speed", &params.speed, 10.0f, 300.0f, "%.0f");
+                                
+                                ImGui::Spacing();
+                                ImGui::Spacing();
                             }
+                            ImGui::Spacing();
                             ImGui::TreePop();
                         }
 
+                        ImGui::Spacing();
+                        
                         // --- Collisions ---
-                        if (ImGui::TreeNode("Collisioni"))
+                        if (ImGui::TreeNode("Collisions"))
                         {
-                            ImGui::Checkbox("Attive##collisions", &params.collisionsEnabled);
-                            if (params.collisionsEnabled) {
-                                ImGui::Text("(Implementazione futura)");
-                            }
+                            ImGui::Spacing();
+                            ImGui::Checkbox("Active", &params.collisionsEnabled);
+                            ImGui::SliderFloat("Radius", &params.collisionRadius, 10.0f, 200.0f, "%.0f px");
+                            ImGui::Spacing();
                             ImGui::TreePop();
                         }
 
-                        // --- Boids ---
-                        if (ImGui::TreeNode("Boids"))
+                        ImGui::Spacing();
+
+                        // --- Boundaries / Topology ---
+                        if (ImGui::TreeNode("Boundary Topology"))
                         {
-                            ImGui::Checkbox("Attiva sulle particelle##boids", &params.boidsEnabled);
-                            if (params.boidsEnabled) {
-                                ImGui::SliderFloat("Allineamento", &params.alignmentWeight, 0.0f, 5.0f);
-                                ImGui::SliderFloat("Separazione", &params.separationWeight, 0.0f, 5.0f);
-                                ImGui::SliderFloat("Coesione", &params.cohesionWeight, 0.0f, 5.0f);
-                                ImGui::Text("(Implementazione futura)");
-                            }
+                            static const char* boundaryOptions[] = {
+                                "Toroidal wrap (current)",
+                                "Rigid bounce (reflect)",
+                                "Klein X (wrap X, flip Y)",
+                                "Klein Y (wrap Y, flip X)"
+                            };
+
+                            ImGui::Spacing();
+                            ImGui::Combo("Mode", &params.boundaryMode, boundaryOptions, IM_ARRAYSIZE(boundaryOptions));
+                            ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Scegli come i bordi collegano lo spazio");
+                            ImGui::Spacing();
                             ImGui::TreePop();
                         }
+
+                        ImGui::Spacing();
+                        
+                        
+                        ImGui::Unindent(10);
                     }
 
-                    // ========== TEXTURE ==========
-                    if (ImGui::CollapsingHeader("Texture"))
+                    ImGui::Spacing();
+
+                    // ========== TEXTURE & COLORS ==========
+                    if (ImGui::CollapsingHeader("[ COLORS ]"))
                     {
-                        ImGui::Text("Trasformazioni Colore");
-                        ImGui::Text("(Palette mapping - futuro)");
+                        ImGui::Indent(10);
+                        ImGui::Spacing();
+                        ImGui::ColorEdit3("Color A", params.color1);
+                        ImGui::ColorEdit3("Color B", params.color2);
+                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "Mix based on particle angle");
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
                     }
 
-                    // ========== AUTOMATON ==========
-                    if (ImGui::CollapsingHeader("Automaton"))
+                    ImGui::Spacing();
+
+                    // ========== BOIDS FLOCKING ==========
+                    if (ImGui::CollapsingHeader("[ BOIDS FLOCKING ]"))
                     {
-                        ImGui::Text("Game of Life / Custom Rules");
-                        ImGui::Text("(Implementazione futura)");
+                        ImGui::Indent(10);
+                        ImGui::Spacing();
+                        ImGui::Checkbox("Enable Boids", &params.boidsEnabled);
+                        if (params.boidsEnabled) {
+                            ImGui::SliderFloat("Alignment", &params.alignment, 0.0f, 2.0f);
+                            ImGui::SliderFloat("Separation", &params.separation, 0.0f, 2.0f);
+                            ImGui::SliderFloat("Cohesion", &params.cohesion, 0.0f, 2.0f);
+                            ImGui::SliderFloat("Radius", &params.radius, 10.0f, 100.0f);
+                        }
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
                     }
+
+                    ImGui::Spacing();
 
                     // ========== MOUSE EFFECTS ==========
-                    if (ImGui::CollapsingHeader("Effetti Mouse", ImGuiTreeNodeFlags_DefaultOpen))
+                    if (ImGui::CollapsingHeader("[ MOUSE EFFECTS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
-                        ImGui::RadioButton("Attrai", &params.mouseMode, 0);
-                        ImGui::RadioButton("Respingi", &params.mouseMode, 1);
-                        ImGui::RadioButton("Anello (Attrai+Respingi)", &params.mouseMode, 2);
-                        ImGui::RadioButton("Vortice (Forza Perpendicolare)", &params.mouseMode, 3);
+                        ImGui::Indent(10);
+                        ImGui::Spacing();
+                        ImGui::RadioButton("Attract", &params.mouseMode, 0);
+                        ImGui::RadioButton("Repel", &params.mouseMode, 1);
+                        ImGui::RadioButton("Ring (Attract+Repel)", &params.mouseMode, 2);
+                        ImGui::RadioButton("Vortex (Perpendicular)", &params.mouseMode, 3);
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
                     }
+
+                    ImGui::Spacing();
 
                     // ========== PARTICLE MANAGEMENT ==========
-                    if (ImGui::CollapsingHeader("Gestione Particelle"))
+                    if (ImGui::CollapsingHeader("[ PARTICLES ]"))
                     {
-                        ImGui::SliderInt("Numero Particelle Target", &params.targetParticleCount, 10000, 5000000);
-                        ImGui::Text("(Cambio count: richiede reinit)");
+                        ImGui::Indent(10);
+                        ImGui::Spacing();
+                        int maxCount = simulation.getMaxParticleCount();
+                        params.targetParticleCount = std::clamp(params.targetParticleCount, 10000, maxCount);
+                        ImGui::TextColored(ImVec4(0.7f, 0.8f, 0.7f, 1.0f), "Active: %d / %d", simulation.getParticleCount(), maxCount);
+                        ImGui::SliderInt("Particle Count", &params.targetParticleCount, 10000, maxCount, "%d", ImGuiSliderFlags_AlwaysClamp);
+                        ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.4f, 1.0f), "Cambia live senza riavviare");
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
                     }
+                    
+                    ImGui::PopStyleColor(3);
+                    
+                    ImGui::EndChild(); // End scrollable region
                 }
                 ImGui::End();
+                ImGui::PopStyleVar();
             }
 
-            // --- UPDATE SIMULATION PARAMETERS ---
-            if (params.physarumEnabled) {
-                simulation.setSensorDistance(params.sensorDistance);
-                simulation.setSensorAngle(params.sensorAngle);
-                simulation.setTurnAngle(params.turnAngle);
-                simulation.setSpeed(params.speed);
-            }
+            // --- UPDATE SIMULATION PARAMETERS FROM UI ---
+            simulation.setPhysarumEnabled(params.physarumEnabled);
+            simulation.setPhysarumIntensity(params.physarumIntensity);
+            simulation.setSensorDistance(params.sensorDistance);
+            simulation.setSensorAngle(params.sensorAngle);
+            simulation.setTurnAngle(params.turnAngle);
+            simulation.setSpeed(params.speed);
+            simulation.setRandomWeight(0.05f); // Fixed for now
+
+            // Collisions
+            simulation.setCollisionsEnabled(params.collisionsEnabled);
+            simulation.setCollisionRadius(params.collisionRadius);
+            simulation.setBoundaryMode(params.boundaryMode);
+            
+            // Colors
+            simulation.setColor1(params.color1[0], params.color1[1], params.color1[2]);
+            simulation.setColor2(params.color2[0], params.color2[1], params.color2[2]);
+            
+            // Boids
+            simulation.setBoidsEnabled(params.boidsEnabled);
+            simulation.setAlignmentWeight(params.alignment);
+            simulation.setSeparationWeight(params.separation);
+            simulation.setCohesionWeight(params.cohesion);
+            simulation.setBoidsRadius(params.radius);
+            
+            // Particle pool
+            simulation.setActiveParticleCount(params.targetParticleCount);
 
             // --- INPUT & SIMULATION ---
             inputHandler.update();
@@ -270,14 +466,13 @@ int main(int argc, char **argv)
             double winH = (double)windowManager.getHeight();
             
             double nx = mx / winW;
-            double ny = (winH - my) / winH; // Inverted Y
+            double ny = (winH - my) / winH;
 
             float simMouseX = (float)(nx * simWidth);
             float simMouseY = (float)(ny * simHeight);
             
             bool isPressed = inputHandler.isLeftClicked() && !io.WantCaptureMouse;
 
-            // Mouse mode: 0=Attract, 1=Repel, 2=Ring, 3=Vortex
             int shaderMouseMode = params.mouseMode;
 
             double currentTime = glfwGetTime();

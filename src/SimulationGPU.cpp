@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstdlib> // rand()
 #include <iostream>
+#include <algorithm>
 
 #include <GLFW/glfw3.h> // se ti serve per glfwGetTime
 
@@ -42,7 +43,8 @@ static GLuint compileShader(const std::string &source, GLenum shaderType)
 // --------------------------------------------------
 
 SimulationGPU::SimulationGPU(int particleCount, int width, int height)
-    : m_particleCount(particleCount)
+    : m_maxParticles(particleCount)
+    , m_activeParticles(particleCount)
     , m_width(width)
     , m_height(height)
     , m_initialized(false)
@@ -51,12 +53,31 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_textureIDOut(0)
     , m_updateProgramID(0)
     , m_blurProgramID(0)
-    , m_sensorDistance(20.0f) // Distanza sensore
-    , m_sensorAngle(0.785f)   // 45 gradi
-    , m_turnAngle(0.785f)     // 45 gradi
-    , m_speed(100.0f)         // Velocita base
-    , m_randomWeight(0.05f)   // Random noise
+    , m_sensorDistance(20.0f)
+    , m_sensorAngle(0.785f)
+    , m_turnAngle(0.785f)
+    , m_speed(100.0f)
+    , m_randomWeight(0.05f)
+    , m_boundaryMode(0)
+    , m_physarumEnabled(false)
+    , m_physarumIntensity(1.0f)
+    , m_boidsEnabled(false)
+    , m_alignmentWeight(1.0f)
+    , m_separationWeight(1.2f)
+    , m_cohesionWeight(1.0f)
+    , m_boidsRadius(50.0f)
+    , m_collisionsEnabled(false)
+    , m_collisionRadius(30.0f)
+    , m_gridWidth(0)
+    , m_gridHeight(0)
+    , m_cellSize(40.0f)
+    , m_gridHeadBuffer(0)
+    , m_particleNextBuffer(0)
+    , m_gridResetProgramID(0)
+    , m_gridBuildProgramID(0)
 {
+    m_color1[0] = 0.0f; m_color1[1] = 1.0f; m_color1[2] = 1.0f; // Cyan
+    m_color2[0] = 1.0f; m_color2[1] = 0.0f; m_color2[2] = 1.0f; // Magenta
     m_particleBuffers[0] = 0;
     m_particleBuffers[1] = 0;
 }
@@ -64,16 +85,18 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
 SimulationGPU::~SimulationGPU()
 {
     // Rilascia risorse
-    if (m_updateProgramID) {
-        glDeleteProgram(m_updateProgramID);
-    }
-    if (m_blurProgramID) {
-        glDeleteProgram(m_blurProgramID);
-    }
+    if (m_updateProgramID) glDeleteProgram(m_updateProgramID);
+    if (m_blurProgramID) glDeleteProgram(m_blurProgramID);
+    if (m_gridResetProgramID) glDeleteProgram(m_gridResetProgramID);
+    if (m_gridBuildProgramID) glDeleteProgram(m_gridBuildProgramID);
 
     glDeleteTextures(1, &m_textureIDIn);
     glDeleteTextures(1, &m_textureIDOut);
     glDeleteBuffers(2, m_particleBuffers);
+    glDeleteBuffers(1, &m_gridHeadBuffer);
+    glDeleteBuffers(1, &m_particleNextBuffer);
+    
+    glDeleteQueries(4, m_timeQueries);
 }
 
 void SimulationGPU::initialize()
@@ -82,10 +105,11 @@ void SimulationGPU::initialize()
 
     createComputeShaders();
     createTextures();
+    createGridBuffers();
 
     // Crea i due SSBO per le particelle
     glGenBuffers(2, m_particleBuffers);
-    size_t bufferSize = m_particleCount * sizeof(GpuParticle);
+    size_t bufferSize = static_cast<size_t>(m_maxParticles) * sizeof(GpuParticle);
 
     for(int i=0; i<2; ++i) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[i]);
@@ -98,29 +122,121 @@ void SimulationGPU::initialize()
     m_currentBuffer = 0;
 
     m_initialized = true;
+    
+    // Performance Queries
+    glGenQueries(4, m_timeQueries);
 }
 
+void SimulationGPU::setActiveParticleCount(int count)
+{
+    int clamped = std::max(1, std::min(count, m_maxParticles));
+    if (clamped == m_activeParticles) return;
+
+    // If we are enabling more particles, seed them with random values.
+    if (clamped > m_activeParticles) {
+        int start = m_activeParticles;
+        int toInit = clamped - m_activeParticles;
+
+        std::vector<GpuParticle> particles(toInit);
+        for (int i = 0; i < toInit; ++i)
+        {
+            particles[i].position[0] = static_cast<float>(rand() % m_width);
+            particles[i].position[1] = static_cast<float>(rand() % m_height);
+            particles[i].angle = static_cast<float>(rand()) / RAND_MAX * 6.28318530718f;
+
+            float minSpeed = 10.0f, maxSpeed = 100.0f;
+            float r = static_cast<float>(rand()) / RAND_MAX;
+            particles[i].speed = minSpeed + r*(maxSpeed - minSpeed);
+        }
+
+        GLintptr offset = static_cast<GLintptr>(start) * sizeof(GpuParticle);
+        GLsizeiptr sizeBytes = static_cast<GLsizeiptr>(toInit) * sizeof(GpuParticle);
+        for (int i = 0; i < 2; ++i) {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[i]);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, sizeBytes, particles.data());
+        }
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    }
+
+    m_activeParticles = clamped;
+}
+
+// --------------------------------------------------
 void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePressed, int mouseMode)
 {
     if (!m_initialized) return;
+    
+    const int activeCount = m_activeParticles;
 
-    // PASS 1: update e deposit su m_textureIDIn
+    // 0. Start Timer
+    glQueryCounter(m_timeQueries[0], GL_TIMESTAMP);
+
+    // --- PASS 0: Grid Reset & Build (needed for Boids or Collisions) ---
+    if (m_boidsEnabled || m_collisionsEnabled) {
+        // ... (Calls Grid Shaders)
+        glUseProgram(m_gridResetProgramID);
+        int numCells = m_gridWidth * m_gridHeight;
+        glUniform1i(glGetUniformLocation(m_gridResetProgramID, "uNumCells"), numCells);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_gridHeadBuffer);
+        glDispatchCompute((numCells + 255) / 256, 1, 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        glUseProgram(m_gridBuildProgramID);
+        glUniform1i(glGetUniformLocation(m_gridBuildProgramID, "uParticleCount"), activeCount);
+        glUniform1f(glGetUniformLocation(m_gridBuildProgramID, "uCellSize"), m_cellSize);
+        glUniform1i(glGetUniformLocation(m_gridBuildProgramID, "uGridWidth"), m_gridWidth);
+        glUniform1i(glGetUniformLocation(m_gridBuildProgramID, "uGridHeight"), m_gridHeight);
+        
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_particleBuffers[m_currentBuffer]);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_gridHeadBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, m_particleNextBuffer);
+        
+        glDispatchCompute((activeCount + 255) / 256, 1, 1);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    }
+    
+    // 1. Grid Done
+    glQueryCounter(m_timeQueries[1], GL_TIMESTAMP);
+
+    // --- PASS 1: Particle Update & Deposit ---
     {
        glUseProgram(m_updateProgramID);
-
-       // Uniform
-       glUniform1f(glGetUniformLocation(m_updateProgramID, "uDt"), dt);
-       glUniform1i(glGetUniformLocation(m_updateProgramID, "uParticleCount"), m_particleCount);
-       glUniform2f(glGetUniformLocation(m_updateProgramID, "uSimSize"), (float)m_width, (float)m_height);
        
-       // Physarum Settings
+       // ... Uniforms and Bindings ...
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uDt"), dt);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uParticleCount"), activeCount);
+       glUniform2f(glGetUniformLocation(m_updateProgramID, "uSimSize"), (float)m_width, (float)m_height);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uBoundaryMode"), m_boundaryMode);
+       
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uPhysarumEnabled"), m_physarumEnabled ? 1 : 0);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uPhysarumIntensity"), m_physarumIntensity);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorDistance"), m_sensorDistance);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorAngle"), m_sensorAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uTurnAngle"), m_turnAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeed"), m_speed);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uRandomWeight"), m_randomWeight);
+       
+       // Colors
+       glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor1"), 1, m_color1);
+       glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor2"), 1, m_color2);
 
-       // Mouse Interaction
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uCollisionsEnabled"), m_collisionsEnabled ? 1 : 0);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uCollisionRadius"), m_collisionRadius);
+
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uBoidsEnabled"), m_boidsEnabled ? 1 : 0);
+       if (m_boidsEnabled || m_collisionsEnabled) {
+           glUniform1f(glGetUniformLocation(m_updateProgramID, "uAlignmentWeight"), m_alignmentWeight);
+           glUniform1f(glGetUniformLocation(m_updateProgramID, "uSeparationWeight"), m_separationWeight);
+           glUniform1f(glGetUniformLocation(m_updateProgramID, "uCohesionWeight"), m_cohesionWeight);
+           glUniform1f(glGetUniformLocation(m_updateProgramID, "uBoidsRadius"), m_boidsRadius);
+           glUniform1f(glGetUniformLocation(m_updateProgramID, "uCellSize"), m_cellSize);
+           glUniform1i(glGetUniformLocation(m_updateProgramID, "uGridWidth"), m_gridWidth);
+           glUniform1i(glGetUniformLocation(m_updateProgramID, "uGridHeight"), m_gridHeight);
+           
+           glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_gridHeadBuffer);
+           glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, m_particleNextBuffer);
+       }
+
        glUniform2f(glGetUniformLocation(m_updateProgramID, "uMousePos"), mouseX, mouseY);
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uMousePressed"), mousePressed ? 1 : 0);
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uMouseMode"), mouseMode);
@@ -129,47 +245,45 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_particleBuffers[m_currentBuffer]);
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_particleBuffers[nextBuffer]);
 
-       // Binda la texture "m_textureIDIn" come read_write (deposit)
        glBindImageTexture(2, m_textureIDIn, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
 
-       // dispatch
        GLuint groupSize = 128; 
-       GLuint numGroups = (m_particleCount + groupSize - 1) / groupSize;
+       GLuint numGroups = (activeCount + groupSize - 1) / groupSize;
        glDispatchCompute(numGroups, 1, 1);
 
        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-
-       // swap buffer particelle
        m_currentBuffer = nextBuffer;
     }
+    
+    // 2. Update Done
+    glQueryCounter(m_timeQueries[2], GL_TIMESTAMP);
 
-    // PASS 2: blur (legge m_textureIDIn, scrive m_textureIDOut)
+    // --- PASS 2: Blur ---
     {
        glUseProgram(m_blurProgramID);
 
-       // Uniform
        glUniform2i(glGetUniformLocation(m_blurProgramID, "uImageSize"), m_width, m_height);
        glUniform1f(glGetUniformLocation(m_blurProgramID, "uFade"), 0.99f);
 
-       // Binda inImage su binding=0 (readonly), outImage su binding=1 (writeonly)
-       // blur.comp => layout(rgba8, binding=0) uniform readonly image2D inImage;
-       //           => layout(rgba8, binding=1) uniform writeonly image2D outImage;
        glBindImageTexture(0, m_textureIDIn,  0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA8);
        glBindImageTexture(1, m_textureIDOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-       // dispatch 2D
        GLuint gx = (m_width  + 15) / 16;
        GLuint gy = (m_height + 15) / 16;
        glDispatchCompute(gx, gy, 1);
 
        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-       // swap le due texture
-       // cosi' m_textureIDIn conterra' il risultato finale
        std::swap(m_textureIDIn, m_textureIDOut);
     }
+    
+    // 3. Blur Done
+    glQueryCounter(m_timeQueries[3], GL_TIMESTAMP);
+    
+    printPerformanceStats();
 }
 
+// --------------------------------------------------
 void SimulationGPU::createComputeShaders()
 {
     // update.comp
@@ -186,8 +300,7 @@ void SimulationGPU::createComputeShaders()
         if (!success) {
             char infoLog[512];
             glGetProgramInfoLog(m_updateProgramID, 512, nullptr, infoLog);
-            throw std::runtime_error("Update compute shader link error:\n" 
-                                     + std::string(infoLog));
+            throw std::runtime_error("Update shader link error:\n" + std::string(infoLog));
         }
         glDeleteShader(compShader);
     }
@@ -195,10 +308,10 @@ void SimulationGPU::createComputeShaders()
     // blur.comp
     {
         std::string compSource = readFile("shaders/blur.comp");
-        GLuint blurShader = compileShader(compSource, GL_COMPUTE_SHADER);
+        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER);
 
         m_blurProgramID = glCreateProgram();
-        glAttachShader(m_blurProgramID, blurShader);
+        glAttachShader(m_blurProgramID, compShader);
         glLinkProgram(m_blurProgramID);
 
         GLint success;
@@ -206,10 +319,47 @@ void SimulationGPU::createComputeShaders()
         if (!success) {
             char infoLog[512];
             glGetProgramInfoLog(m_blurProgramID, 512, nullptr, infoLog);
-            throw std::runtime_error("Blur compute shader link error:\n" 
-                                     + std::string(infoLog));
+            throw std::runtime_error("Blur shader link error:\n" + std::string(infoLog));
         }
-        glDeleteShader(blurShader);
+        glDeleteShader(compShader);
+    }
+
+    // grid_reset.comp
+    {
+        std::string compSource = readFile("shaders/grid_reset.comp");
+        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER);
+
+        m_gridResetProgramID = glCreateProgram();
+        glAttachShader(m_gridResetProgramID, compShader);
+        glLinkProgram(m_gridResetProgramID);
+
+        GLint success;
+        glGetProgramiv(m_gridResetProgramID, GL_LINK_STATUS, &success);
+        if (!success) {
+            char infoLog[512];
+            glGetProgramInfoLog(m_gridResetProgramID, 512, nullptr, infoLog);
+            throw std::runtime_error("Grid Reset shader link error:\n" + std::string(infoLog));
+        }
+        glDeleteShader(compShader);
+    }
+
+    // grid_build.comp
+    {
+        std::string compSource = readFile("shaders/grid_build.comp");
+        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER);
+
+        m_gridBuildProgramID = glCreateProgram();
+        glAttachShader(m_gridBuildProgramID, compShader);
+        glLinkProgram(m_gridBuildProgramID);
+
+        GLint success;
+        glGetProgramiv(m_gridBuildProgramID, GL_LINK_STATUS, &success);
+        if (!success) {
+            char infoLog[512];
+            glGetProgramInfoLog(m_gridBuildProgramID, 512, nullptr, infoLog);
+            throw std::runtime_error("Grid Build shader link error:\n" + std::string(infoLog));
+        }
+        glDeleteShader(compShader);
     }
 }
 
@@ -244,8 +394,8 @@ void SimulationGPU::createTextures()
 
 void SimulationGPU::initializeParticles()
 {
-    std::vector<GpuParticle> particles(m_particleCount);
-    for (int i = 0; i < m_particleCount; ++i)
+    std::vector<GpuParticle> particles(m_maxParticles);
+    for (int i = 0; i < m_maxParticles; ++i)
     {
         particles[i].position[0] = static_cast<float>(rand() % m_width);
         particles[i].position[1] = static_cast<float>(rand() % m_height);
@@ -262,4 +412,51 @@ void SimulationGPU::initializeParticles()
                     particles.size() * sizeof(GpuParticle),
                     particles.data());
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+void SimulationGPU::createGridBuffers()
+{
+    // Calcola dimensione griglia
+    m_gridWidth = (m_width + (int)m_cellSize - 1) / (int)m_cellSize;
+    m_gridHeight = (m_height + (int)m_cellSize - 1) / (int)m_cellSize;
+    int numCells = m_gridWidth * m_gridHeight;
+    
+    // GridHead (init to -1)
+    std::vector<int> initialHeads(numCells, -1);
+    glGenBuffers(1, &m_gridHeadBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_gridHeadBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numCells * sizeof(int), initialHeads.data(), GL_DYNAMIC_DRAW);
+    
+    // ParticleNext
+    glGenBuffers(1, &m_particleNextBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleNextBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, m_maxParticles * sizeof(int), nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    std::cout << "[Grid] Initialized " << m_gridWidth << "x" << m_gridHeight 
+              << " cells (" << numCells << ") for Spatial Hashing." << std::endl;
+}
+
+void SimulationGPU::printPerformanceStats()
+{
+    GLint available = 0;
+    // Check if Last query is available
+    glGetQueryObjectiv(m_timeQueries[3], GL_QUERY_RESULT_AVAILABLE, &available);
+    if (!available) return;
+
+    GLuint64 times[4];
+    glGetQueryObjectui64v(m_timeQueries[0], GL_QUERY_RESULT, &times[0]);
+    glGetQueryObjectui64v(m_timeQueries[1], GL_QUERY_RESULT, &times[1]);
+    glGetQueryObjectui64v(m_timeQueries[2], GL_QUERY_RESULT, &times[2]);
+    glGetQueryObjectui64v(m_timeQueries[3], GL_QUERY_RESULT, &times[3]);
+    
+    double gridMs = (times[1] - times[0]) / 1000000.0;
+    double updateMs = (times[2] - times[1]) / 1000000.0;
+    double blurMs = (times[3] - times[2]) / 1000000.0;
+    
+    static int logCounter = 0;
+    if (logCounter++ % 60 == 0) {
+         std::cout << "[GPU] Grid: " << gridMs << "ms | Update: " << updateMs 
+                   << "ms | Blur: " << blurMs << "ms" << std::endl;
+    }
 }

@@ -1,0 +1,64 @@
+================================================================================
+REPORT SVILUPPO: GPU PARTICLE SIMULATION (1.000.000 Particelle)
+Data: 08/12/2025
+================================================================================
+
+1. RIEPILOGO LAVORO SVOLTO
+--------------------------------------------------------------------------------
+L'obiettivo principale era implementare una simulazione Boids (Flocking) interamente
+su GPU mantenendo 60 FPS con 1 milione di particelle su risoluzione 4K.
+
+A. Architettura "Spatial Hashing" (Griglia Spaziale)
+   - Implementato un sistema a griglia per evitare la complessità O(N^2) nella ricerca dei vicini.
+   - Strutture Dati GPU (SSBO):
+     1. 'GridHeadBuffer': Punta alla prima particella in ogni cella.
+     2. 'ParticleNextBuffer': Linked List atomica per collegare particelle nella stessa cella.
+   - Pipeline a 3 stadi:
+     1. Reset Griglia (Compute Shader dedicato).
+     2. Build Griglia (Atomic operations su GPU).
+     3. Update Fisica (Lettura griglia per trovare vicini).
+
+B. Simulazione Ibrida
+   - Il motore ora supporta contemporaneamente:
+     - Physarum Polycephalum (Slime mold simulation).
+     - Boids (Alignment, Cohesion, Separation).
+     - Interazione Mouse (Attract, Repel, Vortex, Ring).
+
+C. Diagnostica e UI
+   - ImGui Menu aggiornato con controlli real-time per tutti i parametri fisici.
+   - GPU Profiling: Implementate OpenGL Timer Queries che stampano su console 
+     i tempi esatti in millisecondi per ogni fase (Grid Build, Physics Update, Blur).
+
+2. PUNTI CRITICI E PROBLEMI RISOLTI
+--------------------------------------------------------------------------------
+A. GPU TDR Crash (Freeze del Driver) [CRITICO]
+   - Problema: Con 1M di particelle attratte in un punto, la densità per cella esplodeva.
+     Lo shader tentava di leggere migliaia di vicini, superando il timeout di Windows (TDR)
+     e causando il crash del driver video.
+   - Soluzione: Implementazione di "Hard Limits" nel loop dello shader.
+     - Max Checks Globali: 24 (Lo shader si ferma dopo aver valutato 24 potenziali vicini).
+     - Max Checks per Cella: 8 (Evita loop lunghi in celle sature).
+     Risultato: Simulazione stabile al 100% anche in condizioni di stress estremo.
+
+B. Ottimizzazione Memoria Griglia
+   - Problema: Celle da 80px erano troppo grandi, contenendo troppe particelle inutili.
+   - Soluzione: Ridotto 'cellSize' a 40px. Questo quadruplica la risoluzione della griglia,
+     riducendo la lunghezza delle linked list e migliorando la coerenza della cache GPU.
+
+3. TODO LIST & PROSSIMI PASSI
+--------------------------------------------------------------------------------
+[ ] Visual Debugging:
+    - Implementare modalità di colorazione basate sulla densità (es. particelle "schiacciate" diventano rosse)
+    - Visualizzare la griglia sottostante (opzionale).
+
+[ ] Interazioni Avanzate:
+    - Aggiungere Ostacoli/Muri statici (disegnabili col mouse o texture mask).
+    - Implementare "Predatori" (agenti che spaventano i Boids).
+
+[ ] Ottimizzazioni Future (se si punta a >4M particelle):
+    - L'uso di `atomicExchange` per costruire la griglia può diventare un collo di bottiglia.
+    - Passare a un approccio "Bitonic Sort" o "Radix Sort" su GPU eliminerebbe le collisioni atomiche,
+      rendendo la costruzione della griglia deterministica e ancora più veloce.
+
+[ ] Preset System:
+    - Salvare/Caricare configurazioni di parametri (es. "Tornado", "Calm Flow", "Chaos") su file JSON.

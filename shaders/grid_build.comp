@@ -1,0 +1,51 @@
+#version 450 core
+layout(local_size_x = 256) in;
+
+struct Particle {
+    vec2 position;
+    float angle;
+    float speed;
+};
+
+// Must match binding in SimulationGPU
+layout(std430, binding = 0) readonly buffer InParticles {
+    Particle particles[];
+} inParticles;
+
+layout(std430, binding = 3) buffer GridHeadBuffer {
+    int heads[];
+} gridHead;
+
+layout(std430, binding = 4) writeonly buffer ParticleNextBuffer {
+    int next[];
+} particleNext;
+
+uniform int uParticleCount;
+uniform float uCellSize;
+uniform int uGridWidth;
+uniform int uGridHeight;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= uint(uParticleCount)) return;
+
+    Particle p = inParticles.particles[idx];
+    
+    // Calculate Cell ID
+    int cx = int(p.position.x / uCellSize);
+    int cy = int(p.position.y / uCellSize);
+    
+    // Clamp to valid range (handling out of bounds particles just in case)
+    cx = clamp(cx, 0, uGridWidth - 1);
+    cy = clamp(cy, 0, uGridHeight - 1);
+    
+    int cellIndex = cy * uGridWidth + cx;
+    
+    // Atomic Linked List insertion
+    // Exchange current head with my index, get old head
+    int oldHead = atomicExchange(gridHead.heads[cellIndex], int(idx));
+    
+    // Point my 'next' to old head
+    // Note: Store as int to handle -1
+    particleNext.next[idx] = oldHead;
+}

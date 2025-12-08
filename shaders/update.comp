@@ -20,26 +20,53 @@ layout(std430, binding = 1) writeonly buffer OutParticles {
 // Trail Map (Read/Write)
 layout(rgba8, binding = 2) uniform image2D outImage;
 
+// Boids Grid Buffers
+layout(std430, binding = 3) readonly buffer GridHeadBuffer {
+    int heads[];
+} gridHead;
+layout(std430, binding = 4) readonly buffer ParticleNextBuffer {
+    int next[];
+} particleNext;
+
 // Uniforms
 uniform int   uParticleCount;
 uniform float uDt;
 uniform vec2  uSimSize;
 
 // Physarum Params
+uniform int   uPhysarumEnabled;
+uniform float uPhysarumIntensity;
 uniform float uSensorDistance;
 uniform float uSensorAngle;
 uniform float uTurnAngle;
 uniform float uSpeed;
 uniform float uRandomWeight;
 
+// Boids Params
+uniform int   uBoidsEnabled;
+uniform float uAlignmentWeight;
+uniform float uSeparationWeight;
+uniform float uCohesionWeight;
+uniform float uBoidsRadius;
+uniform float uCellSize;
+uniform int   uGridWidth;
+uniform int   uGridHeight;
+
+// Collisions
+uniform int   uCollisionsEnabled;
+uniform float uCollisionRadius;
+
 // Mouse Interaction
 uniform vec2 uMousePos;
 uniform int  uMousePressed;
-uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Vortex
+uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Ring, 3=Vortex
+
+// Colors
+uniform vec3 uColor1;
+uniform vec3 uColor2;
 
 const float PI = 3.14159265359;
 
-// Hashing PCG (Permuted Congruential Generator)
 uint hash(uint state) {
     state = state * 747796405u + 2891336453u;
     state = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
@@ -50,24 +77,14 @@ float scaleToRange01(uint state) {
     return float(state) / 4294967295.0;
 }
 
-// HSV to RGB helper for nice colors
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-// Sense func
+// Sense function
 float sense(Particle p, float sensorAngleOffset) {
     float sa = p.angle + sensorAngleOffset;
     vec2 dir = vec2(cos(sa), sin(sa));
     vec2 sensorPos = p.position + dir * uSensorDistance;
 
-    // Wrap
-    if (sensorPos.x < 0.0) sensorPos.x += uSimSize.x;
-    if (sensorPos.x >= uSimSize.x) sensorPos.x -= uSimSize.x;
-    if (sensorPos.y < 0.0) sensorPos.y += uSimSize.y;
-    if (sensorPos.y >= uSimSize.y) sensorPos.y -= uSimSize.y;
+    // Wrap (branchless)
+    sensorPos = mod(sensorPos + uSimSize, uSimSize);
 
     ivec2 coord = ivec2(sensorPos);
     vec4 val = imageLoad(outImage, coord);
@@ -81,40 +98,161 @@ void main()
 
     Particle p = inParticles.particles[idx];
 
-    // --- 1. SENSING & TURNING ---
-    uint seed = uint(idx * uDt * 60.0 + p.position.x);
-    float randomSteer = scaleToRange01(hash(seed));
+    // --- 1. PHYSARUM SENSING & TURNING ---
+    float angleChange = 0.0;
+    
+    if (uPhysarumEnabled == 1) {
+        uint seed = uint(idx) * 1664525u + uint(uDt * 10000.0);
+        float randomSteer = scaleToRange01(hash(seed));
 
-    float weightForward = sense(p, 0.0);
-    float weightLeft    = sense(p, uSensorAngle);
-    float weightRight   = sense(p, -uSensorAngle);
+        float weightForward = sense(p, 0.0);
+        float weightLeft    = sense(p, uSensorAngle);
+        float weightRight   = sense(p, -uSensorAngle);
 
-    // Physarum Steering Rules
-    if (weightForward > weightLeft && weightForward > weightRight) {
-        p.angle += (randomSteer - 0.5) * 0.1 * uRandomWeight;
-    }
-    else if (weightForward < weightLeft && weightForward < weightRight) {
-        p.angle += (randomSteer - 0.5) * 2.0 * uTurnAngle;
-    }
-    else if (weightRight > weightLeft) {
-        p.angle -= uTurnAngle * randomSteer;
-    }
-    else if (weightLeft > weightRight) {
-        p.angle += uTurnAngle * randomSteer;
-    }
-    else {
-         p.angle += (randomSteer - 0.5) * uRandomWeight;
-    }
+        float intensity = uPhysarumIntensity;
+        weightForward *= intensity;
+        weightLeft *= intensity;
+        weightRight *= intensity;
 
-    // --- 2. MOUSE ATTRACTION/REPULSION ---
+        if (weightForward > weightLeft && weightForward > weightRight) {
+            angleChange += (randomSteer - 0.5) * 0.1 * uRandomWeight;
+        }
+        else if (weightForward < weightLeft && weightForward < weightRight) {
+            angleChange += (randomSteer - 0.5) * 2.0 * uTurnAngle;
+        }
+        else if (weightRight > weightLeft) {
+            angleChange -= uTurnAngle * randomSteer;
+        }
+        else if (weightLeft > weightRight) {
+            angleChange += uTurnAngle * randomSteer;
+        }
+        else {
+            angleChange += (randomSteer - 0.5) * uRandomWeight;
+        }
+    }
+    
+    // --- 2. NEIGHBOR SEARCH (Boids/Collisions) ---
+    vec2 alignment = vec2(0.0);
+    vec2 cohesion = vec2(0.0);
+    vec2 separation = vec2(0.0);
+    int boidsCount = 0;
+
+    vec2 collisionRepulse = vec2(0.0);
+    int collisionCount = 0;
+
+    if (uBoidsEnabled == 1 || uCollisionsEnabled == 1) {
+        int cx = int(p.position.x / uCellSize);
+        int cy = int(p.position.y / uCellSize);
+        
+        float searchRadius = max(uBoidsRadius, uCollisionRadius);
+        int span = int(ceil(searchRadius / uCellSize));
+        span = clamp(span, 1, 4); // bounded cost, enough coverage for large radii
+
+        float boidsRadiusSq = uBoidsRadius * uBoidsRadius;
+        float collisionRadiusSq = uCollisionRadius * uCollisionRadius;
+
+        const int MAX_GLOBAL_CHECKS = 64;
+        const int MAX_CELL_CHECKS = 8;
+        int totalNeighborsChecked = 0;
+        bool stop = false;
+
+        // Radial shells to avoid directional bias when we stop early
+        for (int r = 0; r <= span && !stop; ++r) {
+            for (int dy = -r; dy <= r && !stop; ++dy) {
+                for (int dx = -r; dx <= r; ++dx) {
+                    if (abs(dx) < r && abs(dy) < r) continue; // only border for this shell
+
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    
+                    // Wrap Grid Checks
+                    if (nx < 0) nx += uGridWidth;
+                    else if (nx >= uGridWidth) nx -= uGridWidth;
+                    if (ny < 0) ny += uGridHeight;
+                    else if (ny >= uGridHeight) ny -= uGridHeight;
+                    
+                    int cellIndex = ny * uGridWidth + nx;
+                    int neighborIdx = gridHead.heads[cellIndex];
+                    
+                    // Traverse Linked List in this cell
+                    int safety = 0; // Prevent infinite loops
+                    
+                    while (neighborIdx != -1 && safety < MAX_CELL_CHECKS) {
+                        if (neighborIdx != int(idx)) {
+                            Particle np = inParticles.particles[neighborIdx];
+                            vec2 diff = np.position - p.position;
+                            
+                            // Torus wrapping distance check
+                            if (diff.x > uSimSize.x * 0.5) diff.x -= uSimSize.x;
+                            else if (diff.x < -uSimSize.x * 0.5) diff.x += uSimSize.x;
+                            if (diff.y > uSimSize.y * 0.5) diff.y -= uSimSize.y;
+                            else if (diff.y < -uSimSize.y * 0.5) diff.y += uSimSize.y;
+                            
+                            float distSq = dot(diff, diff);
+                            
+                            if (uBoidsEnabled == 1 && distSq < boidsRadiusSq) {
+                                alignment += vec2(cos(np.angle), sin(np.angle));
+                                cohesion += diff;
+                                if (distSq > 0.0001) {
+                                    separation -= diff / sqrt(distSq);
+                                }
+                                boidsCount++;
+                            }
+
+                            if (uCollisionsEnabled == 1 && distSq < collisionRadiusSq && distSq > 0.0001) {
+                                collisionRepulse -= diff / max(distSq, 1.0);
+                                collisionCount++;
+                            }
+                            totalNeighborsChecked++;
+                            if (totalNeighborsChecked >= MAX_GLOBAL_CHECKS) { stop = true; break; }
+                        }
+                        neighborIdx = particleNext.next[neighborIdx];
+                        safety++;
+                    }
+                }
+            }
+        }
+        
+        if (boidsCount > 0) {
+            vec2 boidsDir = vec2(0.0);
+            if (length(alignment) > 0.0) boidsDir += normalize(alignment) * uAlignmentWeight;
+            if (length(cohesion) > 0.0) boidsDir += normalize(cohesion / float(boidsCount)) * uCohesionWeight;
+            if (length(separation) > 0.0) boidsDir += normalize(separation / float(boidsCount)) * uSeparationWeight;
+            
+            // Apply boids influence to angle
+            // We create a "Target Direction" and steer towards it
+            if (length(boidsDir) > 0.0) {
+                 float currentAngle = p.angle;
+                 float targetAngle = atan(boidsDir.y, boidsDir.x);
+                 
+                 // Shortest angle turn
+                 float da = targetAngle - currentAngle;
+                 if (da > PI) da -= 2.0 * PI;
+                 if (da < -PI) da += 2.0 * PI;
+                 
+                 // Soft steer (0.1 is steer strength)
+                 angleChange += da * 0.1;
+            }
+        }
+
+        if (uCollisionsEnabled == 1 && collisionCount > 0 && length(collisionRepulse) > 0.0) {
+            vec2 repelDir = normalize(collisionRepulse / float(collisionCount));
+            float targetAngle = atan(repelDir.y, repelDir.x);
+            float da = targetAngle - p.angle;
+            if (da > PI) da -= 2.0 * PI;
+            if (da < -PI) da += 2.0 * PI;
+            angleChange += da * 0.25; // stronger steer to avoid overlaps
+        }
+    }
+    
+    // Apply angle change
+    p.angle += angleChange;
+
+    // --- 3. MOUSE EFFECTS ---
     if (uMousePressed == 1) {
         vec2 toMouse = uMousePos - p.position;
         // Wrap distance
-        if (toMouse.x > uSimSize.x * 0.5) toMouse.x -= uSimSize.x;
-        if (toMouse.x < -uSimSize.x * 0.5) toMouse.x += uSimSize.x;
-        if (toMouse.y > uSimSize.y * 0.5) toMouse.y -= uSimSize.y;
-        if (toMouse.y < -uSimSize.y * 0.5) toMouse.y += uSimSize.y;
-
+        toMouse = mod(toMouse + uSimSize * 0.5, uSimSize) - uSimSize * 0.5;
         float dist = length(toMouse);
         float radius = 400.0;
         
@@ -126,16 +264,14 @@ void main()
                  targetAngle = atan(toMouse.y, toMouse.x);
                  p.speed = uSpeed * 2.0;
             } else if (uMouseMode == 1) { // Repel
-                 targetAngle = atan(-toMouse.y, -toMouse.x); 
+                 targetAngle = atan(-toMouse.y, -toMouse.x);
                  p.speed = uSpeed * 3.0;
-            } else if (uMouseMode == 2) { // Ring (Attract + Repel)
-                 float ringRadius = radius * 0.5; // Target ring distance
+            } else if (uMouseMode == 2) { // Ring
+                 float ringRadius = radius * 0.5;
                  if (dist > ringRadius) {
-                     // Too far: Attract
                      targetAngle = atan(toMouse.y, toMouse.x);
                      p.speed = uSpeed * 2.0;
                  } else {
-                     // Too close: Repel
                      targetAngle = atan(-toMouse.y, -toMouse.x);
                      p.speed = uSpeed * 2.5;
                  }
@@ -148,8 +284,7 @@ void main()
             
             if (applySteer) {
                 float da = targetAngle - p.angle;
-                if (da > PI) da -= 2.0 * PI;
-                if (da < -PI) da += 2.0 * PI;
+                da = mod(da + PI, 2.0 * PI) - PI;
                 p.angle += da * 0.15;
             }
         } else {
@@ -159,25 +294,25 @@ void main()
         p.speed = uSpeed;
     }
 
-    // --- 3. MOVE ---
+    // --- 4. MOVE ---
     vec2 dir = vec2(cos(p.angle), sin(p.angle));
     p.position += dir * p.speed * uDt;
+    p.position = mod(p.position + uSimSize, uSimSize);
 
-    // Boundary Wrap
-    if (p.position.x < 0.0) p.position.x += uSimSize.x;
-    if (p.position.x >= uSimSize.x) p.position.x -= uSimSize.x;
-    if (p.position.y < 0.0) p.position.y += uSimSize.y;
-    if (p.position.y >= uSimSize.y) p.position.y -= uSimSize.y;
-
+    // Write back
     outParticles.particles[idx] = p;
 
-    // --- 4. DEPOSIT TRAIL ---
+    // --- 5. DEPOSIT TRAIL ---
     ivec2 coord = ivec2(p.position);
-    float hue = fract(p.angle / (2.0 * PI)); 
-    vec3 rgb = hsv2rgb(vec3(hue, 1.0, 1.0));
-    vec4 deposit = vec4(rgb, 1.0f) * 0.2; 
+    
+    // New Color Logic: Mix based on Angle
+    float factor = fract(p.angle / (2.0 * PI));
+    vec3 rgb = mix(uColor1, uColor2, factor);
+    
+    float depositAmount = 0.15 * uPhysarumIntensity;
+    vec4 deposit = vec4(rgb, 1.0) * depositAmount;
+    
     vec4 currentVal = imageLoad(outImage, coord);
-    vec4 newVal = currentVal + deposit;
-    newVal = clamp(newVal, 0.0, 1.0);
+    vec4 newVal = min(currentVal + deposit, vec4(1.0));
     imageStore(outImage, coord, newVal);
 }

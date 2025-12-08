@@ -1,0 +1,103 @@
+================================================================================
+STUDIO ANALITICO PROGETTO LEGACY: "FIRE BALL 2.0"
+Data Analisi: 08/12/2025
+================================================================================
+
+1. INTRODUZIONE
+--------------------------------------------------------------------------------
+Questo documento analizza il codice sorgente del progetto "Fire Ball 2.0", un'implementazione
+sperimentale di sistemi particellari basata su CPU (linguaggio C + SDL2).
+L'obiettivo è decodificare gli algoritmi "grezzi" che producevano effetti visivi organici
+e complessi, per poterli replicare (in forma ottimizzata) nell'attuale motore GPU.
+
+Il sistema si basa su un ciclo di feedback stretto tra:
+Agenti -> Scrittura su Griglia (Density Map) -> Lettura Sensori -> Modifica Comportamento -> Agenti.
+
+2. ANALISI DINAMICA (PHYSARUM MODULATO)
+--------------------------------------------------------------------------------
+Il modello di movimento è una variante del "Physarum Polycephalum" (Slime Mold), ma con
+una caratteristica distintiva fondamentale: la **Velocità Variabile**.
+
+A differenza del modello standard (Jones 2010) dove la velocità è costante (`uSpeed`),
+in questo codice la velocità scalare (`speed_mod`) è modulata dalla densità percepita.
+
+Formula (pseudocodice da `dinam.c` riga 357):
+   
+   v_next = MIN(1.0, 
+                0.1 * v_prev + 
+                0.1 * (Density_Center + Density_Left + Density_Right) + 
+                1.1 * (TargetSpeed - v_prev)
+            )
+
+**Effetto Matematico:**
+- **Density Feedback**: Le particelle accelerano quando attraversano zone dense (scie di altre particelle).
+- **Elasticità**: Il termine `1.1 * (TargetSpeed - v_prev)` agisce come una molla che riporta
+  la velocità al valore nominale, creando un comportamento "pulsante" o "elastico" 
+  invece che rigido.
+
+3. ANALISI ALGORITMI DI COLORAZIONE (RENDERING)
+--------------------------------------------------------------------------------
+Il rendering non si limita a disegnare le particelle. La matrice di densità (`gray[][]`)
+viene trasformata in pixel (`rgba`) attraverso funzioni di trasferimento altamente non-lineari.
+La funzione chiave è `rgba_convert()` in `image.c`.
+
+A. Il Fattore "FAT" (Interazione Locale)
+   La colorazione è influenzata dalla distanza da un "Agente Speciale" (o cursore).
+   
+   Fat = 1.0 / ( (Distance / 70.0) + 1.0 )
+
+   Questo crea un gradiente radiale che "accende" o modifica i colori vicino al punto di interesse,
+   rendendo la simulazione interattiva e focalizzata.
+
+B. Mappatura Tono (Hue Mapping) - Esempio "Supernova"
+   In vari preset (es. COLOR 11), la Tinta (Hue) è calcolata come:
+   
+   H = -Fat + MIN( sqrt(Density * 0.05 - 1) * 0.05,  0.71 + 0.01 * cos(0.1 * Density) )
+
+   Dettagli Critici:
+   1. **Sqrt(Density)**: Crea una risposta non lineare alla densità. Le zone molto dense cambiano
+      colore più lentamente delle zone rarefatte. Nota: possibile generazione di NaN per densità basse,
+      che in C/SDL potrebbe tradursi in nero o artefatti visivi (glitch estetici).
+   2. **Cos(Density)**: Introduce una "frequenza spaziale". Man mano che la densità cresce,
+      il colore non cambia monotonicamente ma "ondula". Questo crea anelli concentrici di colore
+      all'interno dei cluster densi (effetto iso-linee).
+
+C. Overflow Aritmetico (Ciclicità Temporale)
+   I preset "With Background" (es. COLOR 20) sfruttano l'overflow degli interi a 8 bit (`uint8_t`).
+   
+   Pixel[Channel] = BaseColor + Density + (PosRadiale + INCREMENT)
+   
+   Dove `INCREMENT` è un contatore frame globale.
+   - Matematicamente: `Val = (A + B + t) mod 256`.
+   - Visivamente: Questo genera onde di colore che si muovono continuamente attraverso lo schermo.
+     L'uso della distanza radiale `(x^2 + y^2)/radius` crea pattern a interferenza circolare (Anelli di Newton)
+     che si sovrappongono alla struttura organica del Physarum.
+
+4. SUGGERIMENTI PER L'IMPLEMENTAZIONE GPU
+--------------------------------------------------------------------------------
+Per portare questi effetti nel progetto GPU (Shader GLSL):
+
+1. **Implementare `speed_mod` dinamico**:
+   Nello shader `update.comp`, modificare la velocità della particella in base alla densità letta
+   nel passo `sense()`.
+   
+   `float density = sense(p);`
+   `p.speed = mix(p.speed, TargetSpeed + density * K, 0.1);`
+
+2. **Palette Procedurali in Post-Processing**:
+   Invece di usare una texture 1D fissa, implementare una funzione analitica nel Fragment Shader
+   che usi `sin()`, `cos()`, `sqrt()` e il tempo (`uTime`) per generare il colore.
+   
+3. **Simulare l'Overflow**:
+   In GLSL i float non overflowano (wrappano o clippano). Per ottenere lo stesso effetto "bande",
+   usare `fract()`:
+   
+   `vec3 col = baseCol + fract(density + length(uv)*freq + uTime);`
+
+5. CONCLUSIONE
+--------------------------------------------------------------------------------
+Il fascino del progetto "Fire Ball 2.0" deriva dall'imperfezione numerica e dalla complessità
+delle funzioni di trasferimento. Non cerca il realismo, ma l'iper-saturazione informativa
+tramite feedback loop (velocità) e mapping caotico (colore).
+L'attuale progetto GPU è troppo "pulito". Reintrodurre queste "impurità matematiche"
+è la chiave per ottenerne l'estetica.
