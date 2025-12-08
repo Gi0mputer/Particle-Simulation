@@ -2,30 +2,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Particle Simulation Debug", // Nome visibile nel menu di debug
-            "type": "cppdbg",                   // Tipo di debugger (C++ Debugger)
-            "request": "launch",                // Modalità di debug: avvia il programma
-            "program": "${workspaceFolder}/build/bin/ParticleSimulation.exe", // Percorso all'eseguibile
-            "args": [],                         // Argomenti da passare al programma (vuoto per ora)
-            "stopAtEntry": false,               // Non fermarsi al primo punto di ingresso (es. main)
-            "cwd": "${workspaceFolder}",        // Directory di lavoro (radice del progetto)
-            "environment": [],                  // Variabili d'ambiente per il programma (vuoto)
-            "externalConsole": false,           // Usa la console integrata di VS Code
-            "MIMode": "gdb",                    // Debugger: GNU Debugger (GDB)
-            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe", // Percorso all'eseguibile di GDB
-            "setupCommands": [                  // Comandi eseguiti automaticamente da GDB
-                {
-                    "description": "Enable pretty-printing for gdb", // Abilita la formattazione leggibile
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel", // Usa lo stile Intel per il disassemblaggio
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
-            "preLaunchTask": "CMake: Build"     // Task eseguito prima di avviare il debugger
+            "name": "Particle Simulation Debug (Release)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/Release/ParticleSimulation.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Particle Simulation Debug (Debug)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/Debug/ParticleSimulation.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "CMake: Build Debug"
         }
     ]
 }
