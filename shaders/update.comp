@@ -67,6 +67,24 @@ uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Ring, 3=Vortex
 // Colors
 uniform vec3 uColor1;
 uniform vec3 uColor2;
+uniform float uColorOffset;
+
+// Helper: RGB to HSV
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// Helper: HSV to RGB
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
 
 const float PI = 3.14159265359;
 
@@ -235,6 +253,16 @@ void main()
         else {
             angleChange += (randomSteer - 0.5) * uRandomWeight;
         }
+        
+        // --- LEGACY DYNAMICS: Speed Modulation ---
+        // Accelerate when sensing trail (Traffic flow behavior)
+        float avgDensity = (weightForward + weightLeft + weightRight) / 3.0;
+        // Elastic relaxation to base speed + Density Boost
+        // The factor 0.05 controls inertia (lower = heavier particles)
+        // avgDensity is usually small (0-1), uSpeed is large (10-100).
+        // We boost speed by density.
+        float targetSpeed = uSpeed * (1.0 + avgDensity * 2.0); 
+        p.speed = mix(p.speed, targetSpeed, 0.1);
     }
     
     // --- 2. NEIGHBOR SEARCH (Boids/Collisions) ---
@@ -452,11 +480,34 @@ void main()
     // --- 5. DEPOSIT TRAIL ---
     ivec2 coord = ivec2(p.position);
     
-    // New Color Logic: Mix based on Angle
-    float factor = fract(p.angle / (2.0 * PI));
-    vec3 rgb = mix(uColor1, uColor2, factor);
+    // New Color Logic: Adaptive
+    vec3 rgb;
+    if (uColorOffset > 0.001) {
+        // "Chameleon" adaptive coloring
+        // Sample what is ahead
+        vec2 sensorDir = vec2(cos(p.angle), sin(p.angle));
+        vec2 posF = applySensorBoundary(p.position + sensorDir * uSensorDistance);
+        vec3 seenCol = imageLoad(outImage, ivec2(posF)).rgb; 
+        
+        if (length(seenCol) < 0.1) {
+             // If dark, default to standard angle-based color
+             float factor = fract(p.angle / (2.0 * PI));
+             rgb = mix(uColor1, uColor2, factor);
+        } else {
+             // Shift Hue of seen color
+             vec3 hsv = rgb2hsv(seenCol);
+             hsv.x = fract(hsv.x + uColorOffset); // apply offset
+             hsv.y = min(hsv.y * 1.5, 1.0);       // Boost Saturation
+             hsv.z = 1.0;                         // Full brightness
+             rgb = hsv2rgb(hsv);
+        }
+    } else {
+        // Standard
+        float factor = fract(p.angle / (2.0 * PI));
+        rgb = mix(uColor1, uColor2, factor);
+    }
     
-    float depositAmount = 0.15 * uPhysarumIntensity;
+    float depositAmount = 0.05 * uPhysarumIntensity;
     vec4 deposit = vec4(rgb, 1.0) * depositAmount;
     
     vec4 currentVal = imageLoad(outImage, coord);

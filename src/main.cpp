@@ -3,6 +3,9 @@
 #include <chrono>
 #include <string>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 // ImGui
 #include <imgui.h>
@@ -142,10 +145,20 @@ int main(int argc, char **argv)
             float sensorAngle = 0.785f;
             float turnAngle = 0.785f;
             float speed = 100.0f;
+            float trailFade = 0.99f;
+            float toneExposure = 3.0f;
+            float autoDimThreshold = 0.25f;
+            float autoDimStrength = 0.5f;
+            float autoDimGlobal = 4.0f;
 
             // Colors
+
             float color1[3] = {0.0f, 1.0f, 1.0f};
             float color2[3] = {1.0f, 0.0f, 1.0f};
+            float colorOffset = 0.0f;
+            int   colorMode = 0;
+            float neonSpeed = 1.0f;
+            float neonRange = 1.0f;
             
             // Boids
             bool boidsEnabled = false;
@@ -171,11 +184,142 @@ int main(int argc, char **argv)
         } params;
         
         constexpr int maxParticles = 5000000;
-        const int initialParticles = 1000000;
+        const int defaultParticles = 1000000;
+        params.targetParticleCount = defaultParticles;
+
+        const std::string configDir = "configs";
+        const std::string defaultConfigPath = configDir + "/default.cfg";
+        std::string currentPresetLabel = "default (non salvato)";
+        std::string presetStatus = "Nessun preset caricato";
+        static char presetNameBuf[64] = "my_preset";
+
+        auto clampParams = [&](SimulationParams& p) {
+            p.sensorDistance = std::clamp(p.sensorDistance, 1.0f, 500.0f);
+            p.sensorAngle    = std::clamp(p.sensorAngle, 0.05f, 1.57f);
+            p.turnAngle      = std::clamp(p.turnAngle, 0.05f, 1.57f);
+            p.speed          = std::clamp(p.speed, 1.0f, 600.0f);
+            p.physarumIntensity = std::clamp(p.physarumIntensity, 0.0f, 5.0f);
+            p.trailFade      = std::clamp(p.trailFade, 0.5f, 0.9999f);
+            p.toneExposure   = std::clamp(p.toneExposure, 0.01f, 20.0f);
+            p.autoDimThreshold = std::clamp(p.autoDimThreshold, 0.0f, 1.0f);
+            p.autoDimStrength  = std::clamp(p.autoDimStrength, 0.0f, 1.0f);
+            p.autoDimGlobal    = std::clamp(p.autoDimGlobal, 0.0f, 20.0f);
+
+            p.alignment  = std::clamp(p.alignment, 0.0f, 2.0f);
+            p.separation = std::clamp(p.separation, 0.0f, 2.0f);
+            p.cohesion   = std::clamp(p.cohesion, 0.0f, 2.0f);
+            p.radius     = std::clamp(p.radius, 5.0f, 300.0f);
+            p.inertia    = std::clamp(p.inertia, 0.0f, 0.99f);
+            p.restitution= std::clamp(p.restitution, 0.0f, 1.5f);
+
+            p.collisionRadius = std::clamp(p.collisionRadius, 5.0f, 400.0f);
+            p.boundaryMode = std::clamp(p.boundaryMode, 0, 3);
+            p.mouseMode = std::clamp(p.mouseMode, 0, 3);
+            p.targetParticleCount = std::clamp(p.targetParticleCount, 10000, maxParticles);
+            p.colorOffset = std::clamp(p.colorOffset, 0.0f, 1.0f);
+            p.colorMode   = std::clamp(p.colorMode, 0, 4);
+            p.neonSpeed   = std::clamp(p.neonSpeed, 0.0f, 10.0f);
+            p.neonRange   = std::clamp(p.neonRange, 0.01f, 10.0f);
+        };
+
+        auto saveParamsToFile = [&](const SimulationParams& p, const std::string& path) -> bool {
+            SimulationParams data = p;
+            clampParams(data);
+            try {
+                std::filesystem::path fsPath(path);
+                if (fsPath.has_parent_path()) {
+                    std::filesystem::create_directories(fsPath.parent_path());
+                }
+                std::ofstream out(path);
+                if (!out.is_open()) return false;
+                out << "physarumEnabled " << (data.physarumEnabled ? 1 : 0) << "\n";
+                out << "physarumIntensity " << data.physarumIntensity << "\n";
+                out << "sensorDistance " << data.sensorDistance << "\n";
+                out << "sensorAngle " << data.sensorAngle << "\n";
+                out << "turnAngle " << data.turnAngle << "\n";
+                out << "speed " << data.speed << "\n";
+                out << "trailFade " << data.trailFade << "\n";
+                out << "toneExposure " << data.toneExposure << "\n";
+                out << "autoDimThreshold " << data.autoDimThreshold << "\n";
+                out << "autoDimStrength " << data.autoDimStrength << "\n";
+                out << "autoDimGlobal " << data.autoDimGlobal << "\n";
+                out << "color1 " << data.color1[0] << " " << data.color1[1] << " " << data.color1[2] << "\n";
+                out << "color2 " << data.color2[0] << " " << data.color2[1] << " " << data.color2[2] << "\n";
+                out << "colorOffset " << data.colorOffset << "\n";
+                out << "colorMode " << data.colorMode << "\n";
+                out << "neonSpeed " << data.neonSpeed << "\n";
+                out << "neonRange " << data.neonRange << "\n";
+                out << "boidsEnabled " << (data.boidsEnabled ? 1 : 0) << "\n";
+                out << "alignment " << data.alignment << "\n";
+                out << "separation " << data.separation << "\n";
+                out << "cohesion " << data.cohesion << "\n";
+                out << "radius " << data.radius << "\n";
+                out << "inertia " << data.inertia << "\n";
+                out << "restitution " << data.restitution << "\n";
+                out << "collisionsEnabled " << (data.collisionsEnabled ? 1 : 0) << "\n";
+                out << "collisionRadius " << data.collisionRadius << "\n";
+                out << "boundaryMode " << data.boundaryMode << "\n";
+                out << "mouseMode " << data.mouseMode << "\n";
+                out << "targetParticleCount " << data.targetParticleCount << "\n";
+                return true;
+            } catch (...) {
+                return false;
+            }
+        };
+
+        auto loadParamsFromFile = [&](SimulationParams& p, const std::string& path) -> bool {
+            std::ifstream in(path);
+            if (!in.is_open()) return false;
+            std::string line, key;
+            while (std::getline(in, line)) {
+                std::istringstream iss(line);
+                if (!(iss >> key)) continue;
+                if (key == "physarumEnabled") { int v; if (iss >> v) p.physarumEnabled = (v != 0); }
+                else if (key == "physarumIntensity") iss >> p.physarumIntensity;
+                else if (key == "sensorDistance") iss >> p.sensorDistance;
+                else if (key == "sensorAngle") iss >> p.sensorAngle;
+                else if (key == "turnAngle") iss >> p.turnAngle;
+                else if (key == "speed") iss >> p.speed;
+                else if (key == "trailFade") iss >> p.trailFade;
+                else if (key == "toneExposure") iss >> p.toneExposure;
+                else if (key == "autoDimThreshold") iss >> p.autoDimThreshold;
+                else if (key == "autoDimStrength") iss >> p.autoDimStrength;
+                else if (key == "autoDimGlobal") iss >> p.autoDimGlobal;
+                else if (key == "color1") iss >> p.color1[0] >> p.color1[1] >> p.color1[2];
+                else if (key == "color2") iss >> p.color2[0] >> p.color2[1] >> p.color2[2];
+                else if (key == "colorOffset") iss >> p.colorOffset;
+                else if (key == "colorMode") iss >> p.colorMode;
+                else if (key == "neonSpeed") iss >> p.neonSpeed;
+                else if (key == "neonRange") iss >> p.neonRange;
+                else if (key == "boidsEnabled") { int v; if (iss >> v) p.boidsEnabled = (v != 0); }
+                else if (key == "alignment") iss >> p.alignment;
+                else if (key == "separation") iss >> p.separation;
+                else if (key == "cohesion") iss >> p.cohesion;
+                else if (key == "radius") iss >> p.radius;
+                else if (key == "inertia") iss >> p.inertia;
+                else if (key == "restitution") iss >> p.restitution;
+                else if (key == "collisionsEnabled") { int v; if (iss >> v) p.collisionsEnabled = (v != 0); }
+                else if (key == "collisionRadius") iss >> p.collisionRadius;
+                else if (key == "boundaryMode") iss >> p.boundaryMode;
+                else if (key == "mouseMode") iss >> p.mouseMode;
+                else if (key == "targetParticleCount") iss >> p.targetParticleCount;
+            }
+            clampParams(p);
+            return true;
+        };
+
+        std::filesystem::create_directories(configDir);
+        if (std::filesystem::exists(defaultConfigPath) && loadParamsFromFile(params, defaultConfigPath)) {
+            currentPresetLabel = "default.cfg";
+            presetStatus = "Caricato default.cfg";
+        } else {
+            clampParams(params);
+            presetStatus = "Usando impostazioni di default hardcoded";
+        }
+
         SimulationGPU simulation(maxParticles, simWidth, simHeight);
         simulation.initialize();
-        simulation.setActiveParticleCount(initialParticles);
-        params.targetParticleCount = initialParticles;
+        simulation.setActiveParticleCount(params.targetParticleCount);
 
         //// 4. RENDER PIPELINE
         RenderPipeline renderPipeline(simWidth, simHeight);
@@ -285,6 +429,56 @@ int main(int argc, char **argv)
                     // Begin scrollable child region for content
                     ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
+                    // ========== CONFIGURATIONS ==========
+                    if (ImGui::CollapsingHeader("[ CONFIGURATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::Indent(10);
+                        ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente: %s", currentPresetLabel.c_str());
+                        ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "%s", presetStatus.c_str());
+                        ImGui::Spacing();
+                        ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
+                        ImGui::Spacing();
+                        if (ImGui::Button("Carica preset", ImVec2(150, 40))) {
+                            std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
+                            if (loadParamsFromFile(params, path)) {
+                                currentPresetLabel = path;
+                                presetStatus = "Caricato " + path;
+                            } else {
+                                presetStatus = "Impossibile caricare " + path;
+                            }
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Salva preset", ImVec2(150, 40))) {
+                            std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
+                            if (saveParamsToFile(params, path)) {
+                                currentPresetLabel = path;
+                                presetStatus = "Salvato " + path;
+                            } else {
+                                presetStatus = "Errore salvataggio " + path;
+                            }
+                        }
+                        ImGui::Spacing();
+                        if (ImGui::Button("Salva come default", ImVec2(170, 40))) {
+                            if (saveParamsToFile(params, defaultConfigPath)) {
+                                currentPresetLabel = "default.cfg";
+                                presetStatus = "Default aggiornato";
+                            } else {
+                                presetStatus = "Errore nel salvataggio default.cfg";
+                            }
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Carica default", ImVec2(150, 40))) {
+                            if (loadParamsFromFile(params, defaultConfigPath)) {
+                                currentPresetLabel = "default.cfg";
+                                presetStatus = "Caricato default.cfg";
+                            } else {
+                                presetStatus = "default.cfg non trovato";
+                            }
+                        }
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
+                    }
+
                     // ========== SIMULATIONS ==========
                     ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.22f, 0.24f, 0.30f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.28f, 0.30f, 0.38f, 1.0f));
@@ -371,7 +565,35 @@ int main(int argc, char **argv)
                         ImGui::Spacing();
                         ImGui::ColorEdit3("Color A", params.color1);
                         ImGui::ColorEdit3("Color B", params.color2);
+                        
+                        // New Color Mutation Logic
+                        ImGui::Separator();
+                        ImGui::Text("Mutation Logic (Chameleon)");
+                        ImGui::SliderFloat("Mutation Offset", &params.colorOffset, 0.0f, 0.5f, "%.2f");
+                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "0=Fisso, 0.5=Complementare");
+                        ImGui::Spacing();
+                        
+                        ImGui::Separator();
+                        static const char* colorModes[] = { "Standard", "Legacy Supernova", "Neon Thermal", "Bismuth Iridescent", "Psycho Overflow" };
+                        ImGui::Combo("Post-FX Mode", &params.colorMode, colorModes, IM_ARRAYSIZE(colorModes));
+                        
+                        if (params.colorMode >= 2) {
+                            ImGui::Indent(10);
+                            ImGui::Text("Neon Controls");
+                            ImGui::SliderFloat("Pulsation Speed", &params.neonSpeed, 0.0f, 5.0f);
+                            ImGui::SliderFloat("Ring Density", &params.neonRange, 0.1f, 3.0f);
+                            ImGui::Unindent(10);
+                        }
+                        
+                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "Scegli l'algoritmo di colorazione");
                         ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "Mix based on particle angle");
+                        ImGui::Separator();
+                        ImGui::SliderFloat("Trail Decay", &params.trailFade, 0.90f, 0.9995f, "%.4f");
+                        ImGui::SliderFloat("Tone Exposure (log)", &params.toneExposure, 0.1f, 10.0f, "%.2f");
+                        ImGui::SliderFloat("Auto-Dim Threshold", &params.autoDimThreshold, 0.0f, 0.8f, "%.2f");
+                        ImGui::SliderFloat("Auto-Dim Strength", &params.autoDimStrength, 0.0f, 1.0f, "%.2f");
+                        ImGui::SliderFloat("Global Dim (1/(1+k*L))", &params.autoDimGlobal, 0.0f, 20.0f, "%.1f");
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Decay più basso = più sottrazione, esposizione riduce i picchi, auto-dim abbassa la media");
                         ImGui::Spacing();
                         ImGui::Unindent(10);
                     }
@@ -446,13 +668,25 @@ int main(int argc, char **argv)
                 ImGui::PopStyleVar();
             }
 
+            // --- UPDATE RENDER PIPELIE ---
+            renderPipeline.setColorMode(params.colorMode);
+            renderPipeline.setTime((float)glfwGetTime());
+            renderPipeline.setColors(params.color1, params.color2);
+            renderPipeline.setNeonParams(params.neonSpeed, params.neonRange);
+
             // --- UPDATE SIMULATION PARAMETERS FROM UI ---
+            simulation.setColorOffset(params.colorOffset);
             simulation.setPhysarumEnabled(params.physarumEnabled);
             simulation.setPhysarumIntensity(params.physarumIntensity);
             simulation.setSensorDistance(params.sensorDistance);
             simulation.setSensorAngle(params.sensorAngle);
             simulation.setTurnAngle(params.turnAngle);
             simulation.setSpeed(params.speed);
+            simulation.setTrailFade(params.trailFade);
+            simulation.setToneExposure(params.toneExposure);
+            simulation.setAutoDimThreshold(params.autoDimThreshold);
+            simulation.setAutoDimStrength(params.autoDimStrength);
+            simulation.setAutoDimGlobal(params.autoDimGlobal);
             simulation.setInertia(params.inertia);
             simulation.setRestitution(params.restitution);
             simulation.setRandomWeight(0.05f); // Fixed for now

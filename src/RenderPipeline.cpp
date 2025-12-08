@@ -56,6 +56,14 @@ void RenderPipeline::finalPass(const SimulationGPU& simulation)
     if (m_final_uTextureLoc >= 0)
         glUniform1i(m_final_uTextureLoc, 0);
 
+    // Pass PostFX uniforms
+    glUniform1i(glGetUniformLocation(m_finalShader.getID(), "uColorMode"), m_colorMode);
+    glUniform1f(glGetUniformLocation(m_finalShader.getID(), "uTime"), m_time);
+    glUniform3fv(glGetUniformLocation(m_finalShader.getID(), "uColor1"), 1, m_color1);
+    glUniform3fv(glGetUniformLocation(m_finalShader.getID(), "uColor2"), 1, m_color2);
+    glUniform1f(glGetUniformLocation(m_finalShader.getID(), "uNeonSpeed"), m_neonSpeed);
+    glUniform1f(glGetUniformLocation(m_finalShader.getID(), "uNeonRange"), m_neonRange);
+
     renderQuad();
 }
 

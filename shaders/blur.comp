@@ -12,6 +12,10 @@ uniform ivec2 uImageSize;
 
 // (Opzionale) fade
 uniform float uFade;
+uniform float uToneExposure; // >0, controls log compression
+uniform float uAutoDimThreshold; // 0..1
+uniform float uAutoDimStrength;  // 0..1
+uniform float uAutoDimGlobal;    // global compression factor
 
 void main()
 {
@@ -32,6 +36,17 @@ void main()
     // fade
     // se uFade<1.0, riduciamo intensità
     blurred *= uFade;
+
+    // Log-like tone mapping to compress highlights
+    float k = max(uToneExposure, 0.001);
+    vec3 toned = log(1.0 + blurred.rgb * k) / log(1.0 + k);
+    // Adaptive dimming: if luminanza locale è sopra soglia, sottraiamo di più
+    float lum = dot(toned, vec3(0.299, 0.587, 0.114));
+    float over = max(0.0, lum - uAutoDimThreshold) / max(1.0 - uAutoDimThreshold, 1e-4);
+    float dim = 1.0 - uAutoDimStrength * over;
+    // Global compression: più luminanza totale -> più attenuazione
+    float globalDim = 1.0 / (1.0 + uAutoDimGlobal * lum);
+    blurred = vec4(toned * dim * globalDim, blurred.a);
 
     imageStore(outImage, gid, blurred);
 }

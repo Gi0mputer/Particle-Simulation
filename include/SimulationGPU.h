@@ -40,6 +40,18 @@ public:
     
     float getSpeed() const { return m_speed; }
     void setSpeed(float val) { m_speed = val; }
+
+    // Trails / post
+    float getTrailFade() const { return m_trailFade; }
+    void setTrailFade(float val) { m_trailFade = std::clamp(val, 0.5f, 0.9999f); }
+    float getToneExposure() const { return m_toneExposure; }
+    void setToneExposure(float val) { m_toneExposure = std::clamp(val, 0.01f, 20.0f); }
+    float getAutoDimThreshold() const { return m_autoDimThreshold; }
+    void setAutoDimThreshold(float val) { m_autoDimThreshold = std::clamp(val, 0.0f, 1.0f); }
+    float getAutoDimStrength() const { return m_autoDimStrength; }
+    void setAutoDimStrength(float val) { m_autoDimStrength = std::clamp(val, 0.0f, 1.0f); }
+    float getAutoDimGlobal() const { return m_autoDimGlobal; }
+    void setAutoDimGlobal(float val) { m_autoDimGlobal = std::clamp(val, 0.0f, 20.0f); }
     
     // Motion tuning
     float getInertia() const { return m_inertia; }
@@ -88,6 +100,10 @@ public:
     void setColor2(float r, float g, float b) { m_color2[0]=r; m_color2[1]=g; m_color2[2]=b; }
     float* getColor1() { return m_color1; }
     float* getColor2() { return m_color2; }
+    
+    // Advanced Color Behavior
+    void setColorOffset(float val) { m_colorOffset = val; }
+    float getColorOffset() const { return m_colorOffset; }
 
 private:
     void createComputeShaders();
@@ -120,6 +136,11 @@ private:
     float m_sensorAngle;
     float m_turnAngle;
     float m_speed;
+    float m_trailFade;
+    float m_toneExposure;
+    float m_autoDimThreshold;
+    float m_autoDimStrength;
+    float m_autoDimGlobal;
     float m_inertia;
     float m_restitution;
     float m_randomWeight;
@@ -141,6 +162,7 @@ private:
     // Colors
     float m_color1[3];
     float m_color2[3];
+    float m_colorOffset;
 
     // Spatial Grid for Boids (Atomic Linked List)
     int m_gridWidth;

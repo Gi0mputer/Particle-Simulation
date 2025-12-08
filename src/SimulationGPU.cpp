@@ -58,12 +58,18 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_sensorAngle(0.785f)
     , m_turnAngle(0.785f)
     , m_speed(100.0f)
+    , m_trailFade(0.99f)
+    , m_toneExposure(3.0f)
+    , m_autoDimThreshold(0.25f)
+    , m_autoDimStrength(0.5f)
+    , m_autoDimGlobal(4.0f)
     , m_inertia(0.85f)
     , m_restitution(1.0f)
     , m_randomWeight(0.05f)
     , m_boundaryMode(0)
     , m_physarumEnabled(false)
     , m_physarumIntensity(1.0f)
+    , m_colorOffset(0.0f) // New
     , m_boidsEnabled(false)
     , m_alignmentWeight(1.0f)
     , m_separationWeight(1.2f)
@@ -225,6 +231,7 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        // Colors
        glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor1"), 1, m_color1);
        glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor2"), 1, m_color2);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uColorOffset"), m_colorOffset);
 
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uCollisionsEnabled"), m_collisionsEnabled ? 1 : 0);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uCollisionRadius"), m_collisionRadius);
@@ -269,7 +276,11 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUseProgram(m_blurProgramID);
 
        glUniform2i(glGetUniformLocation(m_blurProgramID, "uImageSize"), m_width, m_height);
-       glUniform1f(glGetUniformLocation(m_blurProgramID, "uFade"), 0.99f);
+       glUniform1f(glGetUniformLocation(m_blurProgramID, "uFade"), m_trailFade);
+       glUniform1f(glGetUniformLocation(m_blurProgramID, "uToneExposure"), m_toneExposure);
+       glUniform1f(glGetUniformLocation(m_blurProgramID, "uAutoDimThreshold"), m_autoDimThreshold);
+       glUniform1f(glGetUniformLocation(m_blurProgramID, "uAutoDimStrength"), m_autoDimStrength);
+       glUniform1f(glGetUniformLocation(m_blurProgramID, "uAutoDimGlobal"), m_autoDimGlobal);
 
        glBindImageTexture(0, m_textureIDIn,  0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA8);
        glBindImageTexture(1, m_textureIDOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
