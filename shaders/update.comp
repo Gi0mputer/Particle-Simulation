@@ -2,39 +2,76 @@
 
 layout(local_size_x = 128) in;
 
-// Struttura parallela a GpuParticle (CPU)
 struct Particle {
     vec2 position;
     float angle;
     float speed;
 };
 
-// SSBO di input
+// SSBOs
 layout(std430, binding = 0) readonly buffer InParticles {
     Particle particles[];
 } inParticles;
 
-// SSBO di output
 layout(std430, binding = 1) writeonly buffer OutParticles {
     Particle particles[];
 } outParticles;
 
-// Texture RGBA8: depositiamo colore
-// Notare "rgba8" e i qualificatori "readonly"/"writeonly"
+// Trail Map (Read/Write)
 layout(rgba8, binding = 2) uniform image2D outImage;
 
-// Uniform
+// Uniforms
 uniform int   uParticleCount;
 uniform float uDt;
-uniform vec2  uSimSize;  // dimensioni (width, height)
+uniform vec2  uSimSize;
 
-// Esempio parametri
-uniform float uSensorDistance; // non lo useremo nel minimal
-uniform float uRandomWeight;   // per noise eventuale
+// Physarum Params
+uniform float uSensorDistance;
+uniform float uSensorAngle;
+uniform float uTurnAngle;
+uniform float uSpeed;
+uniform float uRandomWeight;
 
-// Semplice rand
-float rand(vec2 co) {
-    return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453);
+// Mouse Interaction
+uniform vec2 uMousePos;
+uniform int  uMousePressed;
+uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Vortex
+
+const float PI = 3.14159265359;
+
+// Hashing PCG (Permuted Congruential Generator)
+uint hash(uint state) {
+    state = state * 747796405u + 2891336453u;
+    state = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (state >> 22u) ^ state;
+}
+
+float scaleToRange01(uint state) {
+    return float(state) / 4294967295.0;
+}
+
+// HSV to RGB helper for nice colors
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+// Sense func
+float sense(Particle p, float sensorAngleOffset) {
+    float sa = p.angle + sensorAngleOffset;
+    vec2 dir = vec2(cos(sa), sin(sa));
+    vec2 sensorPos = p.position + dir * uSensorDistance;
+
+    // Wrap
+    if (sensorPos.x < 0.0) sensorPos.x += uSimSize.x;
+    if (sensorPos.x >= uSimSize.x) sensorPos.x -= uSimSize.x;
+    if (sensorPos.y < 0.0) sensorPos.y += uSimSize.y;
+    if (sensorPos.y >= uSimSize.y) sensorPos.y -= uSimSize.y;
+
+    ivec2 coord = ivec2(sensorPos);
+    vec4 val = imageLoad(outImage, coord);
+    return dot(val.rgb, vec3(0.299, 0.587, 0.114)); 
 }
 
 void main()
@@ -42,37 +79,105 @@ void main()
     uint idx = gl_GlobalInvocationID.x;
     if (idx >= uint(uParticleCount)) return;
 
-    // Leggiamo la particella dal SSBO in
     Particle p = inParticles.particles[idx];
 
-    // Aggiorno la posizione con speed e angle
+    // --- 1. SENSING & TURNING ---
+    uint seed = uint(idx * uDt * 60.0 + p.position.x);
+    float randomSteer = scaleToRange01(hash(seed));
+
+    float weightForward = sense(p, 0.0);
+    float weightLeft    = sense(p, uSensorAngle);
+    float weightRight   = sense(p, -uSensorAngle);
+
+    // Physarum Steering Rules
+    if (weightForward > weightLeft && weightForward > weightRight) {
+        p.angle += (randomSteer - 0.5) * 0.1 * uRandomWeight;
+    }
+    else if (weightForward < weightLeft && weightForward < weightRight) {
+        p.angle += (randomSteer - 0.5) * 2.0 * uTurnAngle;
+    }
+    else if (weightRight > weightLeft) {
+        p.angle -= uTurnAngle * randomSteer;
+    }
+    else if (weightLeft > weightRight) {
+        p.angle += uTurnAngle * randomSteer;
+    }
+    else {
+         p.angle += (randomSteer - 0.5) * uRandomWeight;
+    }
+
+    // --- 2. MOUSE ATTRACTION/REPULSION ---
+    if (uMousePressed == 1) {
+        vec2 toMouse = uMousePos - p.position;
+        // Wrap distance
+        if (toMouse.x > uSimSize.x * 0.5) toMouse.x -= uSimSize.x;
+        if (toMouse.x < -uSimSize.x * 0.5) toMouse.x += uSimSize.x;
+        if (toMouse.y > uSimSize.y * 0.5) toMouse.y -= uSimSize.y;
+        if (toMouse.y < -uSimSize.y * 0.5) toMouse.y += uSimSize.y;
+
+        float dist = length(toMouse);
+        float radius = 400.0;
+        
+        if (dist < radius && dist > 1.0) { 
+            float targetAngle = 0.0;
+            bool applySteer = true;
+
+            if (uMouseMode == 0) { // Attract
+                 targetAngle = atan(toMouse.y, toMouse.x);
+                 p.speed = uSpeed * 2.0;
+            } else if (uMouseMode == 1) { // Repel
+                 targetAngle = atan(-toMouse.y, -toMouse.x); 
+                 p.speed = uSpeed * 3.0;
+            } else if (uMouseMode == 2) { // Ring (Attract + Repel)
+                 float ringRadius = radius * 0.5; // Target ring distance
+                 if (dist > ringRadius) {
+                     // Too far: Attract
+                     targetAngle = atan(toMouse.y, toMouse.x);
+                     p.speed = uSpeed * 2.0;
+                 } else {
+                     // Too close: Repel
+                     targetAngle = atan(-toMouse.y, -toMouse.x);
+                     p.speed = uSpeed * 2.5;
+                 }
+            } else if (uMouseMode == 3) { // Vortex
+                 targetAngle = atan(toMouse.x, -toMouse.y);
+                 p.speed = uSpeed * 1.5;
+            } else {
+                 applySteer = false;
+            }
+            
+            if (applySteer) {
+                float da = targetAngle - p.angle;
+                if (da > PI) da -= 2.0 * PI;
+                if (da < -PI) da += 2.0 * PI;
+                p.angle += da * 0.15;
+            }
+        } else {
+            p.speed = uSpeed;
+        }
+    } else {
+        p.speed = uSpeed;
+    }
+
+    // --- 3. MOVE ---
     vec2 dir = vec2(cos(p.angle), sin(p.angle));
     p.position += dir * p.speed * uDt;
 
-    // Wrap-around
-    if (p.position.x < 0.0)        p.position.x += uSimSize.x;
-    else if (p.position.x>=uSimSize.x) p.position.x -= uSimSize.x;
+    // Boundary Wrap
+    if (p.position.x < 0.0) p.position.x += uSimSize.x;
+    if (p.position.x >= uSimSize.x) p.position.x -= uSimSize.x;
+    if (p.position.y < 0.0) p.position.y += uSimSize.y;
+    if (p.position.y >= uSimSize.y) p.position.y -= uSimSize.y;
 
-    if (p.position.y < 0.0)        p.position.y += uSimSize.y;
-    else if (p.position.y>=uSimSize.y) p.position.y -= uSimSize.y;
-
-    // (Opzionale) piccola variazione di angle
-    float noiseVal = (rand(p.position + vec2(idx,idx)) - 0.5) * uRandomWeight;
-    p.angle += noiseVal;
-
-    // Deposito colore (es. bianco) sulla texture in pos
-    ivec2 pixelCoord = ivec2(p.position);
-    // Clamping a sicurezza
-    pixelCoord = clamp(pixelCoord, ivec2(0), ivec2(uSimSize)-ivec2(1,1));
-
-    // Leggiamo, accumuliamo e scriviamo. Ad es. potremmo fare
-    vec4 oldColor = imageLoad(outImage, pixelCoord);
-    // Accumulo
-    vec4 newColor = oldColor + vec4(0.1,0.1,0.1,1.0); // intensifichiamo canale rgb
-    newColor = clamp(newColor, 0.0, 1.0);
-
-    imageStore(outImage, pixelCoord, newColor);
-
-    // Scriviamo la particella su outParticles
     outParticles.particles[idx] = p;
+
+    // --- 4. DEPOSIT TRAIL ---
+    ivec2 coord = ivec2(p.position);
+    float hue = fract(p.angle / (2.0 * PI)); 
+    vec3 rgb = hsv2rgb(vec3(hue, 1.0, 1.0));
+    vec4 deposit = vec4(rgb, 1.0f) * 0.2; 
+    vec4 currentVal = imageLoad(outImage, coord);
+    vec4 newVal = currentVal + deposit;
+    newVal = clamp(newVal, 0.0, 1.0);
+    imageStore(outImage, coord, newVal);
 }

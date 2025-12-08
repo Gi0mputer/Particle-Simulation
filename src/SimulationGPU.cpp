@@ -51,11 +51,11 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_textureIDOut(0)
     , m_updateProgramID(0)
     , m_blurProgramID(0)
-    , m_sensorDistance(10.f)
-    , m_sensorAngle(0.25f)
-    , m_turnAngle(0.3f)
-    , m_speed(50.f)
-    , m_randomWeight(0.1f)
+    , m_sensorDistance(20.0f) // Distanza sensore
+    , m_sensorAngle(0.785f)   // 45 gradi
+    , m_turnAngle(0.785f)     // 45 gradi
+    , m_speed(100.0f)         // Velocita base
+    , m_randomWeight(0.05f)   // Random noise
 {
     m_particleBuffers[0] = 0;
     m_particleBuffers[1] = 0;
@@ -100,7 +100,7 @@ void SimulationGPU::initialize()
     m_initialized = true;
 }
 
-void SimulationGPU::update(float dt)
+void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePressed, int mouseMode)
 {
     if (!m_initialized) return;
 
@@ -111,19 +111,29 @@ void SimulationGPU::update(float dt)
        // Uniform
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uDt"), dt);
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uParticleCount"), m_particleCount);
-       glUniform2f(glGetUniformLocation(m_updateProgramID, "uSimSize"), 
-                   (float)m_width, (float)m_height);
+       glUniform2f(glGetUniformLocation(m_updateProgramID, "uSimSize"), (float)m_width, (float)m_height);
+       
+       // Physarum Settings
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorDistance"), m_sensorDistance);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorAngle"), m_sensorAngle);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uTurnAngle"), m_turnAngle);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeed"), m_speed);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uRandomWeight"), m_randomWeight);
+
+       // Mouse Interaction
+       glUniform2f(glGetUniformLocation(m_updateProgramID, "uMousePos"), mouseX, mouseY);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uMousePressed"), mousePressed ? 1 : 0);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uMouseMode"), mouseMode);
 
        int nextBuffer = 1 - m_currentBuffer;
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_particleBuffers[m_currentBuffer]);
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_particleBuffers[nextBuffer]);
 
        // Binda la texture "m_textureIDIn" come read_write (deposit)
-       // layout(rgba8, binding=2) uniform image2D outImage; (nel compute)
        glBindImageTexture(2, m_textureIDIn, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
 
        // dispatch
-       GLuint groupSize = 128; // corrisponde al local_size_x
+       GLuint groupSize = 128; 
        GLuint numGroups = (m_particleCount + groupSize - 1) / groupSize;
        glDispatchCompute(numGroups, 1, 1);
 

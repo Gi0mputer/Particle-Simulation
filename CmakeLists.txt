@@ -14,7 +14,8 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib) # Librerie dinamiche
 
 # Librerie necessarie
 find_package(OpenGL REQUIRED)
-find_package(glfw3 REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Includi la directory "include/" (che contiene glad.h e KHR/)
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -35,7 +36,7 @@ file(GLOB SHADERS
 add_executable(ParticleSimulation ${SOURCES})
 
 # Collega GLFW, OpenGL e GLAD
-target_link_libraries(ParticleSimulation glfw OpenGL::GL)
+target_link_libraries(ParticleSimulation PRIVATE glfw imgui::imgui OpenGL::GL)
 
 # Copia la cartella "shaders" nella directory di output
 add_custom_command(TARGET ParticleSimulation POST_BUILD

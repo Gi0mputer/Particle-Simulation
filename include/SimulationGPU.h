@@ -16,15 +16,30 @@ public:
     ~SimulationGPU();
 
     void initialize();
-    void update(float dt);
+    void update(float dt, float mouseX, float mouseY, bool mousePressed, int mouseMode);
 
     // Accesso al buffer delle particelle (per eventuale debug drawing)
     GLuint getParticleBuffer() const { return m_particleBuffers[m_currentBuffer]; }
     int    getParticleCount() const  { return m_particleCount; }
 
     // Restituisce la texture finale (dopo l'ultimo pass). 
-    // Se stai facendo ping-pong, potrebbe essere textureIn dopo lo swap.
     GLuint getFinalTexture() const { return m_textureIDIn; }
+
+    // Parameter Accessors
+    float getSensorDistance() const { return m_sensorDistance; }
+    void setSensorDistance(float val) { m_sensorDistance = val; }
+    
+    float getSensorAngle() const { return m_sensorAngle; }
+    void setSensorAngle(float val) { m_sensorAngle = val; }
+    
+    float getTurnAngle() const { return m_turnAngle; }
+    void setTurnAngle(float val) { m_turnAngle = val; }
+    
+    float getSpeed() const { return m_speed; }
+    void setSpeed(float val) { m_speed = val; }
+    
+    float getRandomWeight() const { return m_randomWeight; }
+    void setRandomWeight(float val) { m_randomWeight = val; }
 
 private:
     void createComputeShaders();
