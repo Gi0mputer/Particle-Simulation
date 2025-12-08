@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glad/glad.h>
+#include <algorithm>
 
 // Struttura GpuParticle
 struct GpuParticle {
@@ -39,6 +40,12 @@ public:
     
     float getSpeed() const { return m_speed; }
     void setSpeed(float val) { m_speed = val; }
+    
+    // Motion tuning
+    float getInertia() const { return m_inertia; }
+    void setInertia(float val) { m_inertia = std::clamp(val, 0.0f, 0.999f); }
+    float getRestitution() const { return m_restitution; }
+    void setRestitution(float val) { m_restitution = std::clamp(val, 0.0f, 1.5f); }
     
     float getRandomWeight() const { return m_randomWeight; }
     void setRandomWeight(float val) { m_randomWeight = val; }
@@ -87,6 +94,7 @@ private:
     void createTextures();
     void initializeParticles();
     void createGridBuffers();  // New: Grid initialization
+    void rebuildGridIfNeeded();
 
 private:
     int   m_maxParticles;
@@ -112,6 +120,8 @@ private:
     float m_sensorAngle;
     float m_turnAngle;
     float m_speed;
+    float m_inertia;
+    float m_restitution;
     float m_randomWeight;
     int   m_boundaryMode;
     

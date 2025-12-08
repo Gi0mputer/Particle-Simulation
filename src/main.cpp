@@ -153,6 +153,8 @@ int main(int argc, char **argv)
             float separation = 1.2f;
             float cohesion = 1.0f;
             float radius = 50.0f;
+            float inertia = 0.85f;
+            float restitution = 1.0f;
             
             // Collisions
             bool collisionsEnabled = false;
@@ -330,6 +332,7 @@ int main(int argc, char **argv)
                             ImGui::Spacing();
                             ImGui::Checkbox("Active", &params.collisionsEnabled);
                             ImGui::SliderFloat("Radius", &params.collisionRadius, 10.0f, 200.0f, "%.0f px");
+                            ImGui::SliderFloat("Restitution", &params.restitution, 0.0f, 1.5f, "%.2f");
                             ImGui::Spacing();
                             ImGui::TreePop();
                         }
@@ -393,6 +396,19 @@ int main(int argc, char **argv)
 
                     ImGui::Spacing();
 
+                    // ========== MOTION ==========
+                    if (ImGui::CollapsingHeader("[ MOTION ]"))
+                    {
+                        ImGui::Indent(10);
+                        ImGui::Spacing();
+                        ImGui::SliderFloat("Inertia", &params.inertia, 0.0f, 0.99f, "%.2f");
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "0 = sterzo immediato, 1 = forte inerzia");
+                        ImGui::Spacing();
+                        ImGui::Unindent(10);
+                    }
+
+                    ImGui::Spacing();
+
                     // ========== MOUSE EFFECTS ==========
                     if (ImGui::CollapsingHeader("[ MOUSE EFFECTS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
@@ -437,6 +453,8 @@ int main(int argc, char **argv)
             simulation.setSensorAngle(params.sensorAngle);
             simulation.setTurnAngle(params.turnAngle);
             simulation.setSpeed(params.speed);
+            simulation.setInertia(params.inertia);
+            simulation.setRestitution(params.restitution);
             simulation.setRandomWeight(0.05f); // Fixed for now
 
             // Collisions

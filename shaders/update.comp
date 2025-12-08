@@ -32,6 +32,7 @@ layout(std430, binding = 4) readonly buffer ParticleNextBuffer {
 uniform int   uParticleCount;
 uniform float uDt;
 uniform vec2  uSimSize;
+uniform int   uBoundaryMode; // 0=Torus,1=Bounce,2=Klein X,3=Klein Y
 
 // Physarum Params
 uniform int   uPhysarumEnabled;
@@ -40,6 +41,8 @@ uniform float uSensorDistance;
 uniform float uSensorAngle;
 uniform float uTurnAngle;
 uniform float uSpeed;
+uniform float uInertia;       // 0 = instant turn, 1 = keep velocity
+uniform float uRestitution;   // collision bounce energy
 uniform float uRandomWeight;
 
 // Boids Params
@@ -77,14 +80,115 @@ float scaleToRange01(uint state) {
     return float(state) / 4294967295.0;
 }
 
+// Boundary helpers
+vec2 applySensorBoundary(vec2 pos) {
+    if (uBoundaryMode == 0) { // Torus
+        pos = mod(pos + uSimSize, uSimSize);
+    } else if (uBoundaryMode == 1) { // Bounce
+        pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
+    } else if (uBoundaryMode == 2) { // Klein wrap on X (flip Y)
+        if (pos.x < 0.0) {
+            pos.x += uSimSize.x;
+            pos.y = uSimSize.y - pos.y;
+        } else if (pos.x >= uSimSize.x) {
+            pos.x -= uSimSize.x;
+            pos.y = uSimSize.y - pos.y;
+        }
+        pos.y = mod(pos.y + uSimSize.y, uSimSize.y);
+        pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
+    } else { // uBoundaryMode == 3, Klein wrap on Y (flip X)
+        if (pos.y < 0.0) {
+            pos.y += uSimSize.y;
+            pos.x = uSimSize.x - pos.x;
+        } else if (pos.y >= uSimSize.y) {
+            pos.y -= uSimSize.y;
+            pos.x = uSimSize.x - pos.x;
+        }
+        pos.x = mod(pos.x + uSimSize.x, uSimSize.x);
+        pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
+    }
+    return pos;
+}
+
+vec2 topologyAwareDiff(vec2 diff) {
+    if (uBoundaryMode == 0) { // Torus shortest vector
+        if (diff.x > uSimSize.x * 0.5) diff.x -= uSimSize.x;
+        else if (diff.x < -uSimSize.x * 0.5) diff.x += uSimSize.x;
+        if (diff.y > uSimSize.y * 0.5) diff.y -= uSimSize.y;
+        else if (diff.y < -uSimSize.y * 0.5) diff.y += uSimSize.y;
+    } else if (uBoundaryMode == 2) { // Klein twist on X axis
+        vec2 alt = diff;
+        alt.x += (diff.x > 0.0 ? -uSimSize.x : uSimSize.x);
+        alt.y = -alt.y;
+        if (dot(alt, alt) < dot(diff, diff)) diff = alt;
+    } else if (uBoundaryMode == 3) { // Klein twist on Y axis
+        vec2 alt = diff;
+        alt.y += (diff.y > 0.0 ? -uSimSize.y : uSimSize.y);
+        alt.x = -alt.x;
+        if (dot(alt, alt) < dot(diff, diff)) diff = alt;
+    }
+    return diff;
+}
+
+vec2 vectorToTarget(vec2 from, vec2 to) {
+    return topologyAwareDiff(to - from);
+}
+
+void applyBoundaryToParticle(inout Particle p, inout vec2 dir) {
+    if (uBoundaryMode == 0) { // Torus
+        p.position = mod(p.position + uSimSize, uSimSize);
+    } else if (uBoundaryMode == 1) { // Bounce
+        if (p.position.x < 0.0) {
+            p.position.x = -p.position.x;
+            dir.x = -dir.x;
+        } else if (p.position.x >= uSimSize.x) {
+            p.position.x = 2.0 * uSimSize.x - p.position.x;
+            dir.x = -dir.x;
+        }
+        if (p.position.y < 0.0) {
+            p.position.y = -p.position.y;
+            dir.y = -dir.y;
+        } else if (p.position.y >= uSimSize.y) {
+            p.position.y = 2.0 * uSimSize.y - p.position.y;
+            dir.y = -dir.y;
+        }
+        p.angle = atan(dir.y, dir.x);
+    } else if (uBoundaryMode == 2) { // Klein wrap on X (flip Y)
+        if (p.position.x < 0.0) {
+            p.position.x += uSimSize.x;
+            p.position.y = uSimSize.y - p.position.y;
+            dir.y = -dir.y;
+        } else if (p.position.x >= uSimSize.x) {
+            p.position.x -= uSimSize.x;
+            p.position.y = uSimSize.y - p.position.y;
+            dir.y = -dir.y;
+        }
+        if (p.position.y < 0.0) p.position.y += uSimSize.y;
+        else if (p.position.y >= uSimSize.y) p.position.y -= uSimSize.y;
+        p.angle = atan(dir.y, dir.x);
+    } else { // uBoundaryMode == 3, Klein wrap on Y (flip X)
+        if (p.position.y < 0.0) {
+            p.position.y += uSimSize.y;
+            p.position.x = uSimSize.x - p.position.x;
+            dir.x = -dir.x;
+        } else if (p.position.y >= uSimSize.y) {
+            p.position.y -= uSimSize.y;
+            p.position.x = uSimSize.x - p.position.x;
+            dir.x = -dir.x;
+        }
+        if (p.position.x < 0.0) p.position.x += uSimSize.x;
+        else if (p.position.x >= uSimSize.x) p.position.x -= uSimSize.x;
+        p.angle = atan(dir.y, dir.x);
+    }
+}
+
 // Sense function
 float sense(Particle p, float sensorAngleOffset) {
     float sa = p.angle + sensorAngleOffset;
     vec2 dir = vec2(cos(sa), sin(sa));
     vec2 sensorPos = p.position + dir * uSensorDistance;
 
-    // Wrap (branchless)
-    sensorPos = mod(sensorPos + uSimSize, uSimSize);
+    sensorPos = applySensorBoundary(sensorPos);
 
     ivec2 coord = ivec2(sensorPos);
     vec4 val = imageLoad(outImage, coord);
@@ -97,6 +201,8 @@ void main()
     if (idx >= uint(uParticleCount)) return;
 
     Particle p = inParticles.particles[idx];
+    vec2 prevDir = vec2(cos(p.angle), sin(p.angle));
+    float desiredSpeed = uSpeed;
 
     // --- 1. PHYSARUM SENSING & TURNING ---
     float angleChange = 0.0;
@@ -139,10 +245,14 @@ void main()
 
     vec2 collisionRepulse = vec2(0.0);
     int collisionCount = 0;
+    float collisionOverlapAccum = 0.0;
+    vec2 collisionNormal = vec2(0.0);
 
     if (uBoidsEnabled == 1 || uCollisionsEnabled == 1) {
         int cx = int(p.position.x / uCellSize);
         int cy = int(p.position.y / uCellSize);
+        cx = clamp(cx, 0, uGridWidth - 1);
+        cy = clamp(cy, 0, uGridHeight - 1);
         
         float searchRadius = max(uBoidsRadius, uCollisionRadius);
         int span = int(ceil(searchRadius / uCellSize));
@@ -154,39 +264,65 @@ void main()
         const int MAX_GLOBAL_CHECKS = 64;
         const int MAX_CELL_CHECKS = 8;
         int totalNeighborsChecked = 0;
-        bool stop = false;
 
-        // Radial shells to avoid directional bias when we stop early
-        for (int r = 0; r <= span && !stop; ++r) {
-            for (int dy = -r; dy <= r && !stop; ++dy) {
-                for (int dx = -r; dx <= r; ++dx) {
+        int cellsToCheck = (2 * span + 1) * (2 * span + 1);
+        int budgetPerCell = MAX_GLOBAL_CHECKS / max(cellsToCheck, 1);
+        budgetPerCell = clamp(budgetPerCell, 1, MAX_CELL_CHECKS);
+
+        // Radial shells, iterated with a small random offset to remove directional bias
+        for (int r = 0; r <= span && totalNeighborsChecked < MAX_GLOBAL_CHECKS; ++r) {
+            int ringSize = 2 * r + 1;
+            uint ringSeed = hash(uint(idx) + uint(r) * 1664525u);
+            int xOffset = (ringSize > 0) ? int(ringSeed % uint(ringSize)) : 0;
+            int yOffset = (ringSize > 0) ? int((ringSeed / uint(max(ringSize, 1))) % uint(ringSize)) : 0;
+
+            for (int dyStep = 0; dyStep < ringSize && totalNeighborsChecked < MAX_GLOBAL_CHECKS; ++dyStep) {
+                int dy = ((dyStep + yOffset) % ringSize) - r;
+                for (int dxStep = 0; dxStep < ringSize && totalNeighborsChecked < MAX_GLOBAL_CHECKS; ++dxStep) {
+                    int dx = ((dxStep + xOffset) % ringSize) - r;
                     if (abs(dx) < r && abs(dy) < r) continue; // only border for this shell
 
                     int nx = cx + dx;
                     int ny = cy + dy;
                     
-                    // Wrap Grid Checks
-                    if (nx < 0) nx += uGridWidth;
-                    else if (nx >= uGridWidth) nx -= uGridWidth;
-                    if (ny < 0) ny += uGridHeight;
-                    else if (ny >= uGridHeight) ny -= uGridHeight;
+                    bool validCell = true;
+                    if (nx < 0 || nx >= uGridWidth) {
+                        if (uBoundaryMode == 0) { // torus
+                            if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
+                        } else if (uBoundaryMode == 2) { // Klein X twist
+                            if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
+                            ny = uGridHeight - 1 - ny;
+                        } else if (uBoundaryMode == 3) { // Klein Y twist keeps X wrapped
+                            if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
+                        } else { // Bounce
+                            validCell = false;
+                        }
+                    }
+
+                    if (ny < 0 || ny >= uGridHeight) {
+                        if (uBoundaryMode == 0) {
+                            if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
+                        } else if (uBoundaryMode == 2) { // X twist, Y wraps normally
+                            if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
+                        } else if (uBoundaryMode == 3) { // Y twist mirrors X
+                            if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
+                            nx = uGridWidth - 1 - nx;
+                            if (nx < 0) nx += uGridWidth;
+                            else if (nx >= uGridWidth) nx -= uGridWidth;
+                        } else {
+                            validCell = false;
+                        }
+                    }
+                    if (!validCell) continue;
                     
                     int cellIndex = ny * uGridWidth + nx;
                     int neighborIdx = gridHead.heads[cellIndex];
                     
-                    // Traverse Linked List in this cell
-                    int safety = 0; // Prevent infinite loops
-                    
-                    while (neighborIdx != -1 && safety < MAX_CELL_CHECKS) {
+                    int checkedInCell = 0;
+                    while (neighborIdx != -1 && checkedInCell < budgetPerCell && totalNeighborsChecked < MAX_GLOBAL_CHECKS) {
                         if (neighborIdx != int(idx)) {
                             Particle np = inParticles.particles[neighborIdx];
-                            vec2 diff = np.position - p.position;
-                            
-                            // Torus wrapping distance check
-                            if (diff.x > uSimSize.x * 0.5) diff.x -= uSimSize.x;
-                            else if (diff.x < -uSimSize.x * 0.5) diff.x += uSimSize.x;
-                            if (diff.y > uSimSize.y * 0.5) diff.y -= uSimSize.y;
-                            else if (diff.y < -uSimSize.y * 0.5) diff.y += uSimSize.y;
+                            vec2 diff = topologyAwareDiff(np.position - p.position);
                             
                             float distSq = dot(diff, diff);
                             
@@ -202,12 +338,13 @@ void main()
                             if (uCollisionsEnabled == 1 && distSq < collisionRadiusSq && distSq > 0.0001) {
                                 collisionRepulse -= diff / max(distSq, 1.0);
                                 collisionCount++;
+                                float dist = sqrt(distSq);
+                                collisionOverlapAccum += max(0.0, uCollisionRadius - dist);
                             }
                             totalNeighborsChecked++;
-                            if (totalNeighborsChecked >= MAX_GLOBAL_CHECKS) { stop = true; break; }
                         }
                         neighborIdx = particleNext.next[neighborIdx];
-                        safety++;
+                        checkedInCell++;
                     }
                 }
             }
@@ -236,68 +373,78 @@ void main()
         }
 
         if (uCollisionsEnabled == 1 && collisionCount > 0 && length(collisionRepulse) > 0.0) {
-            vec2 repelDir = normalize(collisionRepulse / float(collisionCount));
-            float targetAngle = atan(repelDir.y, repelDir.x);
-            float da = targetAngle - p.angle;
-            if (da > PI) da -= 2.0 * PI;
-            if (da < -PI) da += 2.0 * PI;
-            angleChange += da * 0.25; // stronger steer to avoid overlaps
+            collisionNormal = normalize(collisionRepulse / float(collisionCount));
         }
     }
     
-    // Apply angle change
-    p.angle += angleChange;
+    // Apply angle change with inertia-aware scaling
+    float targetAngle = p.angle + angleChange * (1.0 - uInertia);
 
     // --- 3. MOUSE EFFECTS ---
     if (uMousePressed == 1) {
-        vec2 toMouse = uMousePos - p.position;
-        // Wrap distance
-        toMouse = mod(toMouse + uSimSize * 0.5, uSimSize) - uSimSize * 0.5;
+        vec2 toMouse = vectorToTarget(p.position, uMousePos);
         float dist = length(toMouse);
         float radius = 400.0;
         
         if (dist < radius && dist > 1.0) { 
-            float targetAngle = 0.0;
+            float desiredAngle = targetAngle;
             bool applySteer = true;
 
             if (uMouseMode == 0) { // Attract
-                 targetAngle = atan(toMouse.y, toMouse.x);
-                 p.speed = uSpeed * 2.0;
+                 desiredAngle = atan(toMouse.y, toMouse.x);
+                 desiredSpeed = uSpeed * 2.0;
             } else if (uMouseMode == 1) { // Repel
-                 targetAngle = atan(-toMouse.y, -toMouse.x);
-                 p.speed = uSpeed * 3.0;
+                 desiredAngle = atan(-toMouse.y, -toMouse.x);
+                 desiredSpeed = uSpeed * 3.0;
             } else if (uMouseMode == 2) { // Ring
                  float ringRadius = radius * 0.5;
                  if (dist > ringRadius) {
-                     targetAngle = atan(toMouse.y, toMouse.x);
-                     p.speed = uSpeed * 2.0;
+                     desiredAngle = atan(toMouse.y, toMouse.x);
+                     desiredSpeed = uSpeed * 2.0;
                  } else {
-                     targetAngle = atan(-toMouse.y, -toMouse.x);
-                     p.speed = uSpeed * 2.5;
+                     desiredAngle = atan(-toMouse.y, -toMouse.x);
+                     desiredSpeed = uSpeed * 2.5;
                  }
             } else if (uMouseMode == 3) { // Vortex
-                 targetAngle = atan(toMouse.x, -toMouse.y);
-                 p.speed = uSpeed * 1.5;
+                 desiredAngle = atan(toMouse.x, -toMouse.y);
+                 desiredSpeed = uSpeed * 1.5;
             } else {
                  applySteer = false;
             }
             
             if (applySteer) {
-                float da = targetAngle - p.angle;
+                float da = desiredAngle - targetAngle;
                 da = mod(da + PI, 2.0 * PI) - PI;
-                p.angle += da * 0.15;
+                targetAngle = targetAngle + da * 0.15 * (1.0 - uInertia);
             }
         } else {
-            p.speed = uSpeed;
+            desiredSpeed = uSpeed;
         }
     } else {
-        p.speed = uSpeed;
+        desiredSpeed = uSpeed;
     }
+
+    // Inertia blend: keep part of previous heading
+    vec2 targetDir = vec2(cos(targetAngle), sin(targetAngle));
+    vec2 blendedDir = normalize(mix(prevDir, targetDir, 1.0 - uInertia));
+    p.angle = atan(blendedDir.y, blendedDir.x);
+
+    // Speed blend (energy-like conservation)
+    p.speed = mix(p.speed, desiredSpeed, 1.0 - uInertia);
 
     // --- 4. MOVE ---
     vec2 dir = vec2(cos(p.angle), sin(p.angle));
+    // Collision response: reflect and push apart
+    if (collisionCount > 0 && length(collisionNormal) > 0.0) {
+        dir = normalize(reflect(dir, collisionNormal));
+        float avgOverlap = collisionOverlapAccum / float(max(collisionCount, 1));
+        p.position += collisionNormal * avgOverlap * 0.5;
+        p.speed = max(5.0, p.speed * uRestitution);
+        p.angle = atan(dir.y, dir.x);
+    }
+
     p.position += dir * p.speed * uDt;
-    p.position = mod(p.position + uSimSize, uSimSize);
+    applyBoundaryToParticle(p, dir);
 
     // Write back
     outParticles.particles[idx] = p;

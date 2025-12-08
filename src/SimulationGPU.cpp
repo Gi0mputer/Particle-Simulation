@@ -7,6 +7,7 @@
 #include <cstdlib> // rand()
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 
 #include <GLFW/glfw3.h> // se ti serve per glfwGetTime
 
@@ -57,6 +58,8 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_sensorAngle(0.785f)
     , m_turnAngle(0.785f)
     , m_speed(100.0f)
+    , m_inertia(0.85f)
+    , m_restitution(1.0f)
     , m_randomWeight(0.05f)
     , m_boundaryMode(0)
     , m_physarumEnabled(false)
@@ -173,6 +176,7 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
 
     // --- PASS 0: Grid Reset & Build (needed for Boids or Collisions) ---
     if (m_boidsEnabled || m_collisionsEnabled) {
+        rebuildGridIfNeeded();
         // ... (Calls Grid Shaders)
         glUseProgram(m_gridResetProgramID);
         int numCells = m_gridWidth * m_gridHeight;
@@ -214,6 +218,8 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorAngle"), m_sensorAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uTurnAngle"), m_turnAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeed"), m_speed);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uInertia"), m_inertia);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uRestitution"), m_restitution);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uRandomWeight"), m_randomWeight);
        
        // Colors
@@ -435,6 +441,30 @@ void SimulationGPU::createGridBuffers()
 
     std::cout << "[Grid] Initialized " << m_gridWidth << "x" << m_gridHeight 
               << " cells (" << numCells << ") for Spatial Hashing." << std::endl;
+}
+
+void SimulationGPU::rebuildGridIfNeeded()
+{
+    if (!(m_boidsEnabled || m_collisionsEnabled)) return;
+
+    float targetRadius = std::max(m_boidsRadius, m_collisionRadius);
+    float desiredCell = std::max(10.0f, targetRadius * 0.8f);
+    desiredCell = std::min(desiredCell, 80.0f);
+
+    if (std::abs(desiredCell - m_cellSize) < 0.1f) return;
+
+    m_cellSize = desiredCell;
+
+    if (m_gridHeadBuffer) {
+        glDeleteBuffers(1, &m_gridHeadBuffer);
+        m_gridHeadBuffer = 0;
+    }
+    if (m_particleNextBuffer) {
+        glDeleteBuffers(1, &m_particleNextBuffer);
+        m_particleNextBuffer = 0;
+    }
+
+    createGridBuffers();
 }
 
 void SimulationGPU::printPerformanceStats()
