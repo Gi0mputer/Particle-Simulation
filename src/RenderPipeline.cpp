@@ -44,6 +44,8 @@ void RenderPipeline::finalPass(const SimulationGPU& simulation)
     // Disegna sul framebuffer di default (la finestra)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, m_outputWidth, m_outputHeight);
+    glClearColor(m_backgroundColor[0], m_backgroundColor[1], m_backgroundColor[2], 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     m_finalShader.use();
 

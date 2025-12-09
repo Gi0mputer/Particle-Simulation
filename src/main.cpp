@@ -155,6 +155,7 @@ int main(int argc, char **argv)
 
             float color1[3] = {0.0f, 1.0f, 1.0f};
             float color2[3] = {1.0f, 0.0f, 1.0f};
+            float backgroundColor[3] = {0.0f, 0.0f, 0.0f};
             float colorOffset = 0.0f;
             int   colorMode = 0;
             float neonSpeed = 1.0f;
@@ -223,6 +224,9 @@ int main(int argc, char **argv)
             p.colorMode   = std::clamp(p.colorMode, 0, 4);
             p.neonSpeed   = std::clamp(p.neonSpeed, 0.0f, 10.0f);
             p.neonRange   = std::clamp(p.neonRange, 0.01f, 10.0f);
+            for (int i = 0; i < 3; ++i) {
+                p.backgroundColor[i] = std::clamp(p.backgroundColor[i], 0.0f, 1.0f);
+            }
         };
 
         auto saveParamsToFile = [&](const SimulationParams& p, const std::string& path) -> bool {
@@ -248,6 +252,7 @@ int main(int argc, char **argv)
                 out << "autoDimGlobal " << data.autoDimGlobal << "\n";
                 out << "color1 " << data.color1[0] << " " << data.color1[1] << " " << data.color1[2] << "\n";
                 out << "color2 " << data.color2[0] << " " << data.color2[1] << " " << data.color2[2] << "\n";
+                out << "backgroundColor " << data.backgroundColor[0] << " " << data.backgroundColor[1] << " " << data.backgroundColor[2] << "\n";
                 out << "colorOffset " << data.colorOffset << "\n";
                 out << "colorMode " << data.colorMode << "\n";
                 out << "neonSpeed " << data.neonSpeed << "\n";
@@ -290,6 +295,7 @@ int main(int argc, char **argv)
                 else if (key == "autoDimGlobal") iss >> p.autoDimGlobal;
                 else if (key == "color1") iss >> p.color1[0] >> p.color1[1] >> p.color1[2];
                 else if (key == "color2") iss >> p.color2[0] >> p.color2[1] >> p.color2[2];
+                else if (key == "backgroundColor") iss >> p.backgroundColor[0] >> p.backgroundColor[1] >> p.backgroundColor[2];
                 else if (key == "colorOffset") iss >> p.colorOffset;
                 else if (key == "colorMode") iss >> p.colorMode;
                 else if (key == "neonSpeed") iss >> p.neonSpeed;
@@ -589,6 +595,8 @@ int main(int argc, char **argv)
                         ImGui::Spacing();
                         ImGui::ColorEdit3("Color A", params.color1);
                         ImGui::ColorEdit3("Color B", params.color2);
+                        ImGui::ColorEdit3("Background", params.backgroundColor);
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Sfondo solido, non influisce sulla simulazione");
                         
                         // New Color Mutation Logic
                         ImGui::Separator();
@@ -697,6 +705,7 @@ int main(int argc, char **argv)
             renderPipeline.setTime((float)glfwGetTime());
             renderPipeline.setColors(params.color1, params.color2);
             renderPipeline.setNeonParams(params.neonSpeed, params.neonRange);
+            renderPipeline.setBackgroundColor(params.backgroundColor);
 
             // --- UPDATE SIMULATION PARAMETERS FROM UI ---
             simulation.setColorOffset(params.colorOffset);

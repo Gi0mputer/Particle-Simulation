@@ -21,6 +21,11 @@ public:
         m_color2[0]=c2[0]; m_color2[1]=c2[1]; m_color2[2]=c2[2];
     }
     void setNeonParams(float speed, float range) { m_neonSpeed = speed; m_neonRange = range; }
+    void setBackgroundColor(const float* color) {
+        m_backgroundColor[0] = color[0];
+        m_backgroundColor[1] = color[1];
+        m_backgroundColor[2] = color[2];
+    }
 
 private:
     int m_width, m_height;
@@ -43,6 +48,7 @@ private:
     float m_color2[3] = {1, 0, 1};
     float m_neonSpeed = 1.0f;
     float m_neonRange = 1.0f;
+    float m_backgroundColor[3] = {0.0f, 0.0f, 0.0f};
 
 private:
     void finalPass(const SimulationGPU& simulation);

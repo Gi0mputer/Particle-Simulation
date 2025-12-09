@@ -32,7 +32,7 @@ void main()
     
     if (uColorMode == 0) {
         // Standard
-        FragColor = texVal;
+        FragColor = vec4(texVal.rgb, 1.0);
     } 
     else if (uColorMode == 1) {
         // Legacy Supernova (Fire Ball 2.0)
@@ -83,6 +83,6 @@ void main()
         FragColor = vec4(col * density, 1.0);
     }
     else {
-        FragColor = texVal;
+        FragColor = vec4(texVal.rgb, 1.0);
     }
 }
