@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 // Librerie OpenGL e GLFW
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -58,6 +59,16 @@ namespace Utils
     public:
         static void getSimulationSize(SimulationResolution resolution, int &simWidth, int &simHeight);
     };
+
+    //------------------------------------------------------------
+    // Info hardware (GPU) per preset automatici
+    struct HardwareInfo
+    {
+        std::string vendor;
+        std::string renderer;
+    };
+    HardwareInfo getHardwareInfo();
+    std::string makeHardwarePresetName(const HardwareInfo& info);
 
     //------------------------------------------------------------
     // Funzioni per inizializzare GLAD e configurare OpenGL

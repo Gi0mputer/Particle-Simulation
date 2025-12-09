@@ -3,31 +3,47 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "Ensure Build Directory",
+            "label": "CMake: Configure",
             "command": "cmake",
             "args": [
-                "-B", "${command:cmake.buildDirectory}",
-                "-S", "${workspaceFolder}"
+                "-B", "${workspaceFolder}/build",
+                "-S", "${workspaceFolder}",
+                "-G", "Visual Studio 17 2022",
+                "-A", "x64",
+                "-DCMAKE_PREFIX_PATH=${workspaceFolder}/vcpkg_installed/x64-windows"
             ],
             "problemMatcher": [],
-            "detail": "Crea e configura la directory di build se non esiste."
+            "detail": "Configura il progetto con CMake (Visual Studio 17 2022, x64)."
         },
         {
             "type": "shell",
-            "label": "CMake: Build",
+            "label": "CMake: Build Release",
             "command": "cmake",
             "args": [
-                "--build", "${command:cmake.buildDirectory}"
+                "--build", "${workspaceFolder}/build",
+                "--config", "Release"
             ],
-            "dependsOn": "Ensure Build Directory",
+            "dependsOn": "CMake: Configure",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile"
             ],
-            "detail": "Costruisce il progetto usando la directory di build configurata."
+            "detail": "Compila il progetto in Release."
+        },
+        {
+            "type": "shell",
+            "label": "Copy DLLs",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "Copy-Item '${workspaceFolder}/vcpkg_installed/x64-windows/bin/*.dll' '${workspaceFolder}/build/bin/Release/' -Force"
+            ],
+            "problemMatcher": [],
+            "detail": "Copia le DLL runtime nella directory di output."
         }
     ]
+}
 }

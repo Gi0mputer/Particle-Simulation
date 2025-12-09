@@ -189,6 +189,9 @@ int main(int argc, char **argv)
 
         const std::string configDir = "configs";
         const std::string defaultConfigPath = configDir + "/default.cfg";
+        const Utils::HardwareInfo hardwareInfo = Utils::getHardwareInfo();
+        const std::string hardwarePresetName = Utils::makeHardwarePresetName(hardwareInfo);
+        const std::string hardwarePresetPath = configDir + "/" + hardwarePresetName + ".cfg";
         std::string currentPresetLabel = "default (non salvato)";
         std::string presetStatus = "Nessun preset caricato";
         static char presetNameBuf[64] = "my_preset";
@@ -309,10 +312,18 @@ int main(int argc, char **argv)
         };
 
         std::filesystem::create_directories(configDir);
-        if (std::filesystem::exists(defaultConfigPath) && loadParamsFromFile(params, defaultConfigPath)) {
+        bool presetLoaded = false;
+        if (std::filesystem::exists(hardwarePresetPath) && loadParamsFromFile(params, hardwarePresetPath)) {
+            currentPresetLabel = hardwarePresetName + ".cfg";
+            presetStatus = "Preset hardware caricato";
+            presetLoaded = true;
+        }
+        if (!presetLoaded && std::filesystem::exists(defaultConfigPath) && loadParamsFromFile(params, defaultConfigPath)) {
             currentPresetLabel = "default.cfg";
-            presetStatus = "Caricato default.cfg";
-        } else {
+            presetStatus = "Caricato default.cfg (fallback)";
+            presetLoaded = true;
+        }
+        if (!presetLoaded) {
             clampParams(params);
             presetStatus = "Usando impostazioni di default hardcoded";
         }
@@ -435,6 +446,8 @@ int main(int argc, char **argv)
                         ImGui::Indent(10);
                         ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente: %s", currentPresetLabel.c_str());
                         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "%s", presetStatus.c_str());
+                        ImGui::TextColored(ImVec4(0.6f,0.75f,0.9f,1.0f), "Profilo hardware: %s.cfg", hardwarePresetName.c_str());
+                        ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "GPU: %s", hardwareInfo.renderer.c_str());
                         ImGui::Spacing();
                         ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
                         ImGui::Spacing();
@@ -457,6 +470,17 @@ int main(int argc, char **argv)
                                 presetStatus = "Errore salvataggio " + path;
                             }
                         }
+                        ImGui::Spacing();
+                        if (ImGui::Button("Salva preset hardware", ImVec2(200, 40))) {
+                            if (saveParamsToFile(params, hardwarePresetPath)) {
+                                currentPresetLabel = hardwarePresetName + ".cfg";
+                                presetStatus = "Salvato preset hardware";
+                            } else {
+                                presetStatus = "Errore salvataggio preset hardware";
+                            }
+                        }
+                        ImGui::SameLine();
+                        ImGui::TextColored(ImVec4(0.55f,0.65f,0.75f,1.0f), "File dedicato a questa macchina");
                         ImGui::Spacing();
                         if (ImGui::Button("Salva come default", ImVec2(170, 40))) {
                             if (saveParamsToFile(params, defaultConfigPath)) {

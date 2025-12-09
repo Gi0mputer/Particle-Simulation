@@ -1,7 +1,59 @@
 #include "Utils.h"
+#include <cctype>
 
 namespace Utils
 {
+    namespace
+    {
+        // Converte una stringa hardware in un token sicuro per il filesystem
+        std::string sanitizePresetToken(const std::string& input)
+        {
+            std::string out;
+            out.reserve(input.size());
+            for (char ch : input)
+            {
+                unsigned char c = static_cast<unsigned char>(ch);
+                if (std::isalnum(c))
+                {
+                    out.push_back(static_cast<char>(std::tolower(c)));
+                }
+                else if (c == ' ' || c == '-' || c == '_' || c == '.')
+                {
+                    out.push_back('_');
+                }
+            }
+
+            // Rimuove underscore ripetuti
+            std::string compact;
+            compact.reserve(out.size());
+            bool prevUnderscore = false;
+            for (char ch : out)
+            {
+                if (ch == '_')
+                {
+                    if (!prevUnderscore)
+                    {
+                        compact.push_back(ch);
+                        prevUnderscore = true;
+                    }
+                }
+                else
+                {
+                    compact.push_back(ch);
+                    prevUnderscore = false;
+                }
+            }
+
+            // Trim finale
+            while (!compact.empty() && compact.back() == '_')
+            {
+                compact.pop_back();
+            }
+
+            return compact;
+        }
+    }
+
     //------------------------------------------------------------
     // Gestione del timestep
     // Costruttore: definisci un dt fisso
@@ -133,6 +185,48 @@ namespace Utils
 
         // Se vuoi dimensione punti più grande
         // glPointSize(5.0f);
+    }
+
+    //------------------------------------------------------------
+    // Info hardware (GPU) per preset automatici
+    HardwareInfo getHardwareInfo()
+    {
+        HardwareInfo info;
+        const char* vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+        const char* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+
+        info.vendor = vendor ? vendor : "unknown_vendor";
+        info.renderer = renderer ? renderer : "unknown_renderer";
+        return info;
+    }
+
+    std::string makeHardwarePresetName(const HardwareInfo& info)
+    {
+        std::string base = info.vendor;
+        if (!info.renderer.empty())
+        {
+            if (!base.empty())
+            {
+                base += "_";
+            }
+            base += info.renderer;
+        }
+
+        if (base.empty())
+        {
+            base = "unknown_hw";
+        }
+
+        std::string sanitized = sanitizePresetToken(base);
+        if (sanitized.empty())
+        {
+            sanitized = "unknown_hw";
+        }
+        if (sanitized.size() > 48)
+        {
+            sanitized.resize(48);
+        }
+        return sanitized;
     }
 
     // {
