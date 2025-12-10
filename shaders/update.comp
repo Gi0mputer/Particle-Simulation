@@ -32,7 +32,7 @@ layout(std430, binding = 4) readonly buffer ParticleNextBuffer {
 uniform int   uParticleCount;
 uniform float uDt;
 uniform vec2  uSimSize;
-uniform int   uBoundaryMode; // 0=Torus,1=Bounce,2=Klein X,3=Klein Y
+uniform int   uBoundaryMode; // 0=Torus,1=Bounce,2=Klein bottle full twist
 
 // Physarum Params
 uniform int   uPhysarumEnabled;
@@ -41,6 +41,8 @@ uniform float uSensorDistance;
 uniform float uSensorAngle;
 uniform float uTurnAngle;
 uniform float uSpeed;
+uniform float uSpeedMin;
+uniform float uSpeedMax;
 uniform float uInertia;       // 0 = instant turn, 1 = keep velocity
 uniform float uRestitution;   // collision bounce energy
 uniform float uRandomWeight;
@@ -63,6 +65,12 @@ uniform float uCollisionRadius;
 uniform vec2 uMousePos;
 uniform int  uMousePressed;
 uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Ring, 3=Vortex
+uniform int  uMouseFalloff; // 0=1/r,1=1/r^2,2=1/r^3,3=gaussian,4=osc
+uniform float uMouseStrength;
+uniform float uMouseGaussianSigma;
+uniform float uMouseOscFreq;
+uniform int  uMouseRingOverlay;
+uniform float uMouseRingRadius;
 
 // Colors
 uniform vec3 uColor1;
@@ -107,7 +115,7 @@ vec2 applySensorBoundary(vec2 pos) {
         pos = mod(pos + uSimSize, uSimSize);
     } else if (uBoundaryMode == 1) { // Bounce
         pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
-    } else if (uBoundaryMode == 2) { // Klein wrap on X (flip Y)
+    } else if (uBoundaryMode == 2) { // Klein bottle full twist
         if (pos.x < 0.0) {
             pos.x += uSimSize.x;
             pos.y = uSimSize.y - pos.y;
@@ -115,9 +123,6 @@ vec2 applySensorBoundary(vec2 pos) {
             pos.x -= uSimSize.x;
             pos.y = uSimSize.y - pos.y;
         }
-        pos.y = mod(pos.y + uSimSize.y, uSimSize.y);
-        pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
-    } else { // uBoundaryMode == 3, Klein wrap on Y (flip X)
         if (pos.y < 0.0) {
             pos.y += uSimSize.y;
             pos.x = uSimSize.x - pos.x;
@@ -125,7 +130,6 @@ vec2 applySensorBoundary(vec2 pos) {
             pos.y -= uSimSize.y;
             pos.x = uSimSize.x - pos.x;
         }
-        pos.x = mod(pos.x + uSimSize.x, uSimSize.x);
         pos = clamp(pos, vec2(0.0), uSimSize - vec2(1.0));
     }
     return pos;
@@ -137,16 +141,26 @@ vec2 topologyAwareDiff(vec2 diff) {
         else if (diff.x < -uSimSize.x * 0.5) diff.x += uSimSize.x;
         if (diff.y > uSimSize.y * 0.5) diff.y -= uSimSize.y;
         else if (diff.y < -uSimSize.y * 0.5) diff.y += uSimSize.y;
-    } else if (uBoundaryMode == 2) { // Klein twist on X axis
-        vec2 alt = diff;
-        alt.x += (diff.x > 0.0 ? -uSimSize.x : uSimSize.x);
-        alt.y = -alt.y;
-        if (dot(alt, alt) < dot(diff, diff)) diff = alt;
-    } else if (uBoundaryMode == 3) { // Klein twist on Y axis
-        vec2 alt = diff;
-        alt.y += (diff.y > 0.0 ? -uSimSize.y : uSimSize.y);
-        alt.x = -alt.x;
-        if (dot(alt, alt) < dot(diff, diff)) diff = alt;
+    } else if (uBoundaryMode == 2) { // Klein full twist: evaluate wrapped options
+        vec2 best = diff;
+        float bestLen = dot(best, best);
+
+        // Wrap X with Y flip
+        vec2 alt1 = vec2(diff.x + (diff.x > 0.0 ? -uSimSize.x : uSimSize.x), -diff.y);
+        float l1 = dot(alt1, alt1);
+        if (l1 < bestLen) { best = alt1; bestLen = l1; }
+
+        // Wrap Y with X flip
+        vec2 alt2 = vec2(-diff.x, diff.y + (diff.y > 0.0 ? -uSimSize.y : uSimSize.y));
+        float l2 = dot(alt2, alt2);
+        if (l2 < bestLen) { best = alt2; bestLen = l2; }
+
+        // Wrap both with double flip
+        vec2 alt3 = vec2(-diff.x + (diff.x > 0.0 ? -uSimSize.x : uSimSize.x),
+                         -diff.y + (diff.y > 0.0 ? -uSimSize.y : uSimSize.y));
+        float l3 = dot(alt3, alt3);
+        if (l3 < bestLen) { best = alt3; }
+        diff = best;
     }
     return diff;
 }
@@ -174,7 +188,7 @@ void applyBoundaryToParticle(inout Particle p, inout vec2 dir) {
             dir.y = -dir.y;
         }
         p.angle = atan(dir.y, dir.x);
-    } else if (uBoundaryMode == 2) { // Klein wrap on X (flip Y)
+    } else if (uBoundaryMode == 2) { // Klein bottle full twist: wrap X flips Y, wrap Y flips X
         if (p.position.x < 0.0) {
             p.position.x += uSimSize.x;
             p.position.y = uSimSize.y - p.position.y;
@@ -184,10 +198,6 @@ void applyBoundaryToParticle(inout Particle p, inout vec2 dir) {
             p.position.y = uSimSize.y - p.position.y;
             dir.y = -dir.y;
         }
-        if (p.position.y < 0.0) p.position.y += uSimSize.y;
-        else if (p.position.y >= uSimSize.y) p.position.y -= uSimSize.y;
-        p.angle = atan(dir.y, dir.x);
-    } else { // uBoundaryMode == 3, Klein wrap on Y (flip X)
         if (p.position.y < 0.0) {
             p.position.y += uSimSize.y;
             p.position.x = uSimSize.x - p.position.x;
@@ -197,9 +207,27 @@ void applyBoundaryToParticle(inout Particle p, inout vec2 dir) {
             p.position.x = uSimSize.x - p.position.x;
             dir.x = -dir.x;
         }
-        if (p.position.x < 0.0) p.position.x += uSimSize.x;
-        else if (p.position.x >= uSimSize.x) p.position.x -= uSimSize.x;
         p.angle = atan(dir.y, dir.x);
+    }
+}
+
+float computeMouseFalloff(float dist) {
+    float d = max(dist, 1e-3);
+    if (uMouseFalloff == 0) {       // 1/r
+        return 1.0 / (d + 1.0);
+    } else if (uMouseFalloff == 1) { // 1/r^2
+        return 1.0 / ((d + 1.0) * (d + 1.0));
+    } else if (uMouseFalloff == 2) { // 1/r^3
+        float t = (d + 1.0);
+        return 1.0 / (t * t * t);
+    } else if (uMouseFalloff == 3) { // gaussian
+        float sigma = max(uMouseGaussianSigma, 1.0);
+        float invTwoSigma2 = 1.0 / (2.0 * sigma * sigma);
+        return exp(-d * d * invTwoSigma2);
+    } else { // oscillatory
+        float freq = max(uMouseOscFreq, 0.01);
+        float osc = 0.5 + 0.5 * sin(d * freq);
+        return osc * (1.0 / (d + 1.0));
     }
 }
 
@@ -320,11 +348,14 @@ void main()
                     if (nx < 0 || nx >= uGridWidth) {
                         if (uBoundaryMode == 0) { // torus
                             if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
-                        } else if (uBoundaryMode == 2) { // Klein X twist
-                            if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
-                            ny = uGridHeight - 1 - ny;
-                        } else if (uBoundaryMode == 3) { // Klein Y twist keeps X wrapped
-                            if (nx < 0) nx += uGridWidth; else nx -= uGridWidth;
+                        } else if (uBoundaryMode == 2) { // Klein full twist
+                            if (nx < 0) {
+                                nx += uGridWidth;
+                                ny = uGridHeight - 1 - ny;
+                            } else {
+                                nx -= uGridWidth;
+                                ny = uGridHeight - 1 - ny;
+                            }
                         } else { // Bounce
                             validCell = false;
                         }
@@ -333,11 +364,14 @@ void main()
                     if (ny < 0 || ny >= uGridHeight) {
                         if (uBoundaryMode == 0) {
                             if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
-                        } else if (uBoundaryMode == 2) { // X twist, Y wraps normally
-                            if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
-                        } else if (uBoundaryMode == 3) { // Y twist mirrors X
-                            if (ny < 0) ny += uGridHeight; else ny -= uGridHeight;
-                            nx = uGridWidth - 1 - nx;
+                        } else if (uBoundaryMode == 2) { // Klein full twist
+                            if (ny < 0) {
+                                ny += uGridHeight;
+                                nx = uGridWidth - 1 - nx;
+                            } else {
+                                ny -= uGridHeight;
+                                nx = uGridWidth - 1 - nx;
+                            }
                             if (nx < 0) nx += uGridWidth;
                             else if (nx >= uGridWidth) nx -= uGridWidth;
                         } else {
@@ -415,45 +449,45 @@ void main()
     if (uMousePressed == 1) {
         vec2 toMouse = vectorToTarget(p.position, uMousePos);
         float dist = length(toMouse);
-        float radius = 400.0;
-        
-        if (dist < radius && dist > 1.0) { 
-            float desiredAngle = targetAngle;
-            bool applySteer = true;
+        float falloff = computeMouseFalloff(dist);
+        vec2 dirToMouse = (dist > 1e-6) ? toMouse / dist : vec2(1.0, 0.0);
 
-            if (uMouseMode == 0) { // Attract
-                 desiredAngle = atan(toMouse.y, toMouse.x);
-                 desiredSpeed = uSpeed * 2.0;
-            } else if (uMouseMode == 1) { // Repel
-                 desiredAngle = atan(-toMouse.y, -toMouse.x);
-                 desiredSpeed = uSpeed * 3.0;
-            } else if (uMouseMode == 2) { // Ring
-                 float ringRadius = radius * 0.5;
-                 if (dist > ringRadius) {
-                     desiredAngle = atan(toMouse.y, toMouse.x);
-                     desiredSpeed = uSpeed * 2.0;
-                 } else {
-                     desiredAngle = atan(-toMouse.y, -toMouse.x);
-                     desiredSpeed = uSpeed * 2.5;
-                 }
-            } else if (uMouseMode == 3) { // Vortex
-                 desiredAngle = atan(toMouse.x, -toMouse.y);
-                 desiredSpeed = uSpeed * 1.5;
-            } else {
-                 applySteer = false;
-            }
-            
-            if (applySteer) {
-                float da = desiredAngle - targetAngle;
-                da = mod(da + PI, 2.0 * PI) - PI;
-                targetAngle = targetAngle + da * 0.15 * (1.0 - uInertia);
-            }
-        } else {
-            desiredSpeed = uSpeed;
+        vec2 baseDir = dirToMouse;
+        if (uMouseMode == 1) { // Repel
+            baseDir = -dirToMouse;
+        } else if (uMouseMode == 2) { // Ring mode
+            float ringR = max(uMouseRingRadius, 1.0);
+            float sign = dist - ringR;
+            baseDir = (sign >= 0.0) ? dirToMouse : -dirToMouse;
+            // Stronger near ring transition
+            falloff *= 1.0 + 0.5 * exp(-abs(sign) / (ringR * 0.2));
+        } else if (uMouseMode == 3) { // Vortex
+            baseDir = vec2(dirToMouse.y, -dirToMouse.x);
         }
+
+        // Optional ring overlay blending with other modes
+        if (uMouseRingOverlay == 1 && uMouseMode != 2) {
+            float ringR = max(uMouseRingRadius, 1.0);
+            float sign = dist - ringR;
+            vec2 ringDir = (sign >= 0.0) ? dirToMouse : -dirToMouse;
+            float ringWeight = clamp(exp(-abs(sign) / (ringR * 0.3)), 0.0, 1.0);
+            baseDir = normalize(mix(baseDir, ringDir, ringWeight));
+            falloff *= (1.0 + 0.5 * ringWeight);
+        }
+
+        float strength = max(uMouseStrength, 0.0);
+        float speedBoost = 1.0 + strength * falloff;
+        desiredSpeed = uSpeed * speedBoost;
+
+        float desiredAngle = atan(baseDir.y, baseDir.x);
+        float da = desiredAngle - targetAngle;
+        da = mod(da + PI, 2.0 * PI) - PI;
+        targetAngle = targetAngle + da * 0.2 * (1.0 - uInertia);
     } else {
         desiredSpeed = uSpeed;
     }
+
+    desiredSpeed = clamp(desiredSpeed, uSpeedMin, uSpeedMax);
 
     // Inertia blend: keep part of previous heading
     vec2 targetDir = vec2(cos(targetAngle), sin(targetAngle));
@@ -462,6 +496,7 @@ void main()
 
     // Speed blend (energy-like conservation)
     p.speed = mix(p.speed, desiredSpeed, 1.0 - uInertia);
+    p.speed = clamp(p.speed, uSpeedMin, uSpeedMax);
 
     // --- 4. MOVE ---
     vec2 dir = vec2(cos(p.angle), sin(p.angle));

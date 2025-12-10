@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 #include <algorithm>
+#include <limits>
+#include <cfloat>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
@@ -53,8 +55,8 @@ int main(int argc, char **argv)
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.IniFilename = nullptr; // Disable imgui.ini
         
-        // FONT SIZE - Much bigger!
-        io.FontGlobalScale = 1.6f;
+        // FONT SIZE - Slightly smaller to avoid clipping in narrow panels
+        io.FontGlobalScale = 1.45f;
         
         // Premium Dark Style
         ImGui::StyleColorsDark();
@@ -64,7 +66,7 @@ int main(int argc, char **argv)
         style.WindowRounding = 0.0f;
         style.WindowBorderSize = 0.0f;
         style.WindowPadding = ImVec2(20, 20);
-        style.WindowMinSize = ImVec2(400, 600);
+        style.WindowMinSize = ImVec2(500, 600);
         
         // Frame styling
         style.FrameRounding = 6.0f;
@@ -152,6 +154,8 @@ int main(int argc, char **argv)
             float sensorDistance = 20.0f;
             float sensorAngle = 0.785f;
             float turnAngle = 0.785f;
+            float speedMin = 10.0f;
+            float speedMax = 300.0f;
             float speed = 100.0f;
             float trailFade = 0.99f;
             float toneExposure = 3.0f;
@@ -190,6 +194,12 @@ int main(int argc, char **argv)
 
             // Mouse
             int mouseMode = 0;
+            int mouseFalloff = 1; // 0=1/r,1=1/r^2,2=1/r^3,3=gauss,4=oscillatory
+            float mouseStrength = 1.0f;
+            float mouseGaussianSigma = 250.0f; // pixel radius for gaussian
+            float mouseOscFreq = 0.5f; // cycles per 1000px approx (scaled)
+            bool mouseRingOverlay = false;
+            float mouseRingRadius = 400.0f;
             
             // Particles
             int targetParticleCount = 1000000;
@@ -222,10 +232,13 @@ int main(int argc, char **argv)
         static char presetNameBuf[64] = "my_preset";
 
         auto clampParams = [&](SimulationParams& p) {
+            constexpr float kSpeedMaxCap = 1e9f; // effectively "no cap" for UI max
             p.sensorDistance = std::clamp(p.sensorDistance, 1.0f, 500.0f);
             p.sensorAngle    = std::clamp(p.sensorAngle, 0.05f, 1.57f);
             p.turnAngle      = std::clamp(p.turnAngle, 0.05f, 1.57f);
-            p.speed          = std::clamp(p.speed, 1.0f, 600.0f);
+            p.speedMin       = std::clamp(p.speedMin, 0.0f, kSpeedMaxCap);
+            p.speedMax       = std::clamp(p.speedMax, p.speedMin + 1.0f, kSpeedMaxCap);
+            p.speed          = std::clamp(p.speed, p.speedMin, p.speedMax);
             p.physarumIntensity = std::clamp(p.physarumIntensity, 0.0f, 5.0f);
             p.trailFade      = std::clamp(p.trailFade, 0.5f, 0.9999f);
             p.toneExposure   = std::clamp(p.toneExposure, 0.01f, 20.0f);
@@ -241,7 +254,7 @@ int main(int argc, char **argv)
             p.restitution= std::clamp(p.restitution, 0.0f, 1.5f);
 
             p.collisionRadius = std::clamp(p.collisionRadius, 5.0f, 400.0f);
-            p.boundaryMode = std::clamp(p.boundaryMode, 0, 3);
+            p.boundaryMode = std::clamp(p.boundaryMode, 0, 2);
             p.mouseMode = std::clamp(p.mouseMode, 0, 3);
             p.targetParticleCount = std::clamp(p.targetParticleCount, 10000, maxParticles);
             p.colorOffset = std::clamp(p.colorOffset, 0.0f, 1.0f);
@@ -254,6 +267,12 @@ int main(int argc, char **argv)
             p.colorSource = std::clamp(p.colorSource, 0, 2);
             p.colorSpeedMin = std::clamp(p.colorSpeedMin, 0.0f, 2000.0f);
             p.colorSpeedMax = std::clamp(p.colorSpeedMax, p.colorSpeedMin + 1.0f, 5000.0f);
+            p.mouseMode = std::clamp(p.mouseMode, 0, 3);
+            p.mouseFalloff = std::clamp(p.mouseFalloff, 0, 4);
+            p.mouseStrength = std::clamp(p.mouseStrength, 0.0f, 10.0f);
+            p.mouseGaussianSigma = std::clamp(p.mouseGaussianSigma, 10.0f, 5000.0f);
+            p.mouseOscFreq = std::clamp(p.mouseOscFreq, 0.01f, 20.0f);
+            p.mouseRingRadius = std::clamp(p.mouseRingRadius, 10.0f, 5000.0f);
         };
 
         auto saveParamsToFile = [&](const SimulationParams& p, const std::string& path) -> bool {
@@ -271,6 +290,8 @@ int main(int argc, char **argv)
                 out << "sensorDistance " << data.sensorDistance << "\n";
                 out << "sensorAngle " << data.sensorAngle << "\n";
                 out << "turnAngle " << data.turnAngle << "\n";
+                out << "speedMin " << data.speedMin << "\n";
+                out << "speedMax " << data.speedMax << "\n";
                 out << "speed " << data.speed << "\n";
                 out << "trailFade " << data.trailFade << "\n";
                 out << "toneExposure " << data.toneExposure << "\n";
@@ -298,6 +319,12 @@ int main(int argc, char **argv)
                 out << "collisionRadius " << data.collisionRadius << "\n";
                 out << "boundaryMode " << data.boundaryMode << "\n";
                 out << "mouseMode " << data.mouseMode << "\n";
+                out << "mouseFalloff " << data.mouseFalloff << "\n";
+                out << "mouseStrength " << data.mouseStrength << "\n";
+                out << "mouseGaussianSigma " << data.mouseGaussianSigma << "\n";
+                out << "mouseOscFreq " << data.mouseOscFreq << "\n";
+                out << "mouseRingOverlay " << (data.mouseRingOverlay ? 1 : 0) << "\n";
+                out << "mouseRingRadius " << data.mouseRingRadius << "\n";
                 out << "targetParticleCount " << data.targetParticleCount << "\n";
                 return true;
             } catch (...) {
@@ -317,6 +344,8 @@ int main(int argc, char **argv)
                 else if (key == "sensorDistance") iss >> p.sensorDistance;
                 else if (key == "sensorAngle") iss >> p.sensorAngle;
                 else if (key == "turnAngle") iss >> p.turnAngle;
+                else if (key == "speedMin") iss >> p.speedMin;
+                else if (key == "speedMax") iss >> p.speedMax;
                 else if (key == "speed") iss >> p.speed;
                 else if (key == "trailFade") iss >> p.trailFade;
                 else if (key == "toneExposure") iss >> p.toneExposure;
@@ -344,6 +373,12 @@ int main(int argc, char **argv)
                 else if (key == "collisionRadius") iss >> p.collisionRadius;
                 else if (key == "boundaryMode") iss >> p.boundaryMode;
                 else if (key == "mouseMode") iss >> p.mouseMode;
+                else if (key == "mouseFalloff") iss >> p.mouseFalloff;
+                else if (key == "mouseStrength") iss >> p.mouseStrength;
+                else if (key == "mouseGaussianSigma") iss >> p.mouseGaussianSigma;
+                else if (key == "mouseOscFreq") iss >> p.mouseOscFreq;
+                else if (key == "mouseRingOverlay") { int v; if (iss >> v) p.mouseRingOverlay = (v != 0); }
+                else if (key == "mouseRingRadius") iss >> p.mouseRingRadius;
                 else if (key == "targetParticleCount") iss >> p.targetParticleCount;
             }
             clampParams(p);
@@ -439,17 +474,21 @@ int main(int argc, char **argv)
                 ImVec2 work_pos = ImGui::GetMainViewport()->WorkPos;
                 ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
                 
-                float menuWidth = 650.0f;  // Increased from 450 to 650
+                // Adaptive width: at least 720px, up to 90% of viewport, scaled to 42% by default
+                float menuWidth = std::min(std::max(720.0f, work_size.x * 0.42f), work_size.x * 0.90f);
                 float menuHeight = work_size.y;
                 
                 ImVec2 menu_pos = ImVec2(work_pos.x + work_size.x - menuWidth, work_pos.y);
                 ImGui::SetNextWindowPos(menu_pos, ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(menuWidth, menuHeight), ImGuiCond_Always);
+                ImGui::SetNextWindowSizeConstraints(ImVec2(720.0f, 400.0f), ImVec2(FLT_MAX, FLT_MAX));
                 ImGui::SetNextWindowBgAlpha(0.96f);
 
                 ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(25, 25));
                 if (ImGui::Begin("Settings", nullptr, menu_flags))
                 {
+                    // Let widgets use the full available width
+                    ImGui::PushItemWidth(-FLT_MIN);
                     // Close button (top right inside menu)
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.15f, 0.15f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
@@ -483,108 +522,120 @@ int main(int argc, char **argv)
                     if (ImGui::CollapsingHeader("[ CONFIGURATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         ImGui::Indent(10);
-                        ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente: %s", currentPresetLabel.c_str());
-                        ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "%s", presetStatus.c_str());
-                        ImGui::TextColored(ImVec4(0.6f,0.75f,0.9f,1.0f), "Profilo hardware: %s.cfg", hardwarePresetName.c_str());
-                        ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "GPU in uso (OpenGL): %s", hardwareInfo.renderer.c_str());
-                        if (preferredGpu)
+                        // Info box
+                        if (ImGui::TreeNodeEx("Info", ImGuiTreeNodeFlags_DefaultOpen))
                         {
-                            ImGui::TextColored(ImVec4(0.55f,0.65f,0.75f,1.0f), "GPU preferita: %s", preferredGpuLabel.c_str());
-                            if (!usingPreferredGpu)
-                            {
-                                ImGui::TextColored(ImVec4(0.95f,0.65f,0.25f,1.0f), "ATTENZIONE: forza GPU dedicata nelle impostazioni Windows.");
-                            }
-                        }
-                        else
-                        {
-                            ImGui::TextColored(ImVec4(0.8f,0.5f,0.5f,1.0f), "GPU preferita non rilevata");
-                        }
-                        ImGui::Spacing();
-                        // Lista preset disponibili (scrollabile)
-                        {
-                            std::vector<std::string> presetList;
-                            try {
-                                for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-                                    if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
-                                        presetList.push_back(entry.path().filename().string());
-                                    }
-                                }
-                                std::sort(presetList.begin(), presetList.end());
-                            } catch (...) {
-                                // ignore errors
-                            }
-                            ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset salvati");
-                            ImGui::BeginChild("PresetList", ImVec2(0, 150), true);
-                            for (const auto& name : presetList) {
-                                bool isCurrent = (currentPresetLabel == name || currentPresetLabel == (configDir + "/" + name));
-                                if (ImGui::Selectable(name.c_str(), isCurrent)) {
-                                    std::string stem = std::filesystem::path(name).stem().string();
-                                    std::snprintf(presetNameBuf, IM_ARRAYSIZE(presetNameBuf), "%s", stem.c_str());
-                                }
-                                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-                                    std::string path = std::string(configDir) + "/" + name;
-                                    if (loadParamsFromFile(params, path)) {
-                                        currentPresetLabel = path;
-                                        presetStatus = "Caricato " + path;
-                                    } else {
-                                        presetStatus = "Impossibile caricare " + path;
-                                    }
-                                }
-                            }
-                            ImGui::EndChild();
+                            ImGui::PushTextWrapPos(0.0f);
+                            ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente:");
+                            ImGui::TextColored(ImVec4(0.8f,0.85f,0.9f,1.0f), "%s", currentPresetLabel.c_str());
+                            ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "%s", presetStatus.c_str());
+
                             ImGui::Spacing();
+                            ImGui::TextColored(ImVec4(0.6f,0.75f,0.9f,1.0f), "Profilo hardware:");
+                            ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "%s.cfg", hardwarePresetName.c_str());
+
+                            ImGui::Spacing();
+                            ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "GPU in uso (OpenGL):");
+                            ImGui::TextWrapped("%s", hardwareInfo.renderer.c_str());
+                            if (preferredGpu)
+                            {
+                                ImGui::TextColored(ImVec4(0.55f,0.65f,0.75f,1.0f), "GPU preferita:");
+                                ImGui::TextWrapped("%s", preferredGpuLabel.c_str());
+                                if (!usingPreferredGpu)
+                                {
+                                    ImGui::TextColored(ImVec4(0.95f,0.65f,0.25f,1.0f), "ATTENZIONE: forza GPU dedicata nelle impostazioni Windows.");
+                                }
+                            }
+                            else
+                            {
+                                ImGui::TextColored(ImVec4(0.8f,0.5f,0.5f,1.0f), "GPU preferita non rilevata");
+                            }
+                            ImGui::PopTextWrapPos();
+                            ImGui::Spacing();
+                            ImGui::TreePop();
                         }
 
-                        ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
-                        ImGui::Spacing();
-                        if (ImGui::Button("Carica preset", ImVec2(150, 40))) {
-                            std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
-                            if (loadParamsFromFile(params, path)) {
-                                currentPresetLabel = path;
-                                presetStatus = "Caricato " + path;
-                            } else {
-                                presetStatus = "Impossibile caricare " + path;
+                        // Preset management
+                        if (ImGui::TreeNodeEx("Presets", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            ImGui::Spacing();
+                            ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
+                            ImGui::Spacing();
+                            if (ImGui::Button("Carica preset", ImVec2(170, 40))) {
+                                std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
+                                if (loadParamsFromFile(params, path)) {
+                                    currentPresetLabel = path;
+                                    presetStatus = "Caricato " + path;
+                                } else {
+                                    presetStatus = "Impossibile caricare " + path;
+                                }
                             }
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Salva preset", ImVec2(150, 40))) {
-                            std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
-                            if (saveParamsToFile(params, path)) {
-                                currentPresetLabel = path;
-                                presetStatus = "Salvato " + path;
-                            } else {
-                                presetStatus = "Errore salvataggio " + path;
+                            ImGui::SameLine();
+                            if (ImGui::Button("Salva preset", ImVec2(180, 40))) {
+                                std::string path = std::string(configDir) + "/" + std::string(presetNameBuf) + ".cfg";
+                                if (saveParamsToFile(params, path)) {
+                                    currentPresetLabel = path;
+                                    presetStatus = "Salvato " + path;
+                                } else {
+                                    presetStatus = "Errore salvataggio " + path;
+                                }
                             }
-                        }
-                        ImGui::Spacing();
-                        if (ImGui::Button("Salva preset hardware", ImVec2(200, 40))) {
-                            if (saveParamsToFile(params, hardwarePresetPath)) {
-                                currentPresetLabel = hardwarePresetName + ".cfg";
-                                presetStatus = "Salvato preset hardware";
-                            } else {
-                                presetStatus = "Errore salvataggio preset hardware";
+                            ImGui::Spacing();
+                            if (ImGui::Button("Salva come default", ImVec2(200, 40))) {
+                                if (saveParamsToFile(params, defaultConfigPath)) {
+                                    currentPresetLabel = "default.cfg";
+                                    presetStatus = "Default aggiornato";
+                                } else {
+                                    presetStatus = "Errore nel salvataggio default.cfg";
+                                }
                             }
-                        }
-                        ImGui::SameLine();
-                        ImGui::TextColored(ImVec4(0.55f,0.65f,0.75f,1.0f), "File dedicato a questa macchina");
-                        ImGui::Spacing();
-                        if (ImGui::Button("Salva come default", ImVec2(170, 40))) {
-                            if (saveParamsToFile(params, defaultConfigPath)) {
-                                currentPresetLabel = "default.cfg";
-                                presetStatus = "Default aggiornato";
-                            } else {
-                                presetStatus = "Errore nel salvataggio default.cfg";
+                            ImGui::SameLine();
+                            if (ImGui::Button("Carica default", ImVec2(200, 40))) {
+                                if (loadParamsFromFile(params, defaultConfigPath)) {
+                                    currentPresetLabel = "default.cfg";
+                                    presetStatus = "Caricato default.cfg";
+                                } else {
+                                    presetStatus = "default.cfg non trovato";
+                                }
                             }
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Carica default", ImVec2(150, 40))) {
-                            if (loadParamsFromFile(params, defaultConfigPath)) {
-                                currentPresetLabel = "default.cfg";
-                                presetStatus = "Caricato default.cfg";
-                            } else {
-                                presetStatus = "default.cfg non trovato";
+
+                            ImGui::Spacing();
+                            if (ImGui::TreeNode("Preset salvati"))
+                            {
+                                std::vector<std::string> presetList;
+                                try {
+                                    for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
+                                        if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
+                                            presetList.push_back(entry.path().filename().string());
+                                        }
+                                    }
+                                    std::sort(presetList.begin(), presetList.end());
+                                } catch (...) {
+                                    // ignore errors
+                                }
+                                ImGui::BeginChild("PresetList", ImVec2(0, 150), true);
+                                for (const auto& name : presetList) {
+                                    bool isCurrent = (currentPresetLabel == name || currentPresetLabel == (configDir + "/" + name));
+                                    if (ImGui::Selectable(name.c_str(), isCurrent)) {
+                                        std::string stem = std::filesystem::path(name).stem().string();
+                                        std::snprintf(presetNameBuf, IM_ARRAYSIZE(presetNameBuf), "%s", stem.c_str());
+                                    }
+                                    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+                                        std::string path = std::string(configDir) + "/" + name;
+                                        if (loadParamsFromFile(params, path)) {
+                                            currentPresetLabel = path;
+                                            presetStatus = "Caricato " + path;
+                                        } else {
+                                            presetStatus = "Impossibile caricare " + path;
+                                        }
+                                    }
+                                }
+                                ImGui::EndChild();
+                                ImGui::TreePop();
                             }
+                            ImGui::TreePop();
                         }
+
                         ImGui::Spacing();
                         ImGui::Unindent(10);
                     }
@@ -597,13 +648,20 @@ int main(int argc, char **argv)
                     if (ImGui::CollapsingHeader("[ SIMULATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         ImGui::Indent(10);
+
+                        // Particles count (direct)
+                        int maxCount = simulation.getMaxParticleCount();
+                        params.targetParticleCount = std::clamp(params.targetParticleCount, 10000, maxCount);
+                        ImGui::TextColored(ImVec4(0.7f, 0.8f, 0.7f, 1.0f), "Particles");
+                        ImGui::SliderInt("##ParticleCount", &params.targetParticleCount, 10000, maxCount, "%d", ImGuiSliderFlags_AlwaysClamp);
+                        ImGui::Spacing();
+                        ImGui::Separator();
                         
                         // --- Physarum ---
-                        if (ImGui::TreeNodeEx("Physarum", ImGuiTreeNodeFlags_DefaultOpen))
-                        {
-                            ImGui::Spacing();
-                            ImGui::Checkbox("Active on particles", &params.physarumEnabled);
-                            
+                        ImGui::Checkbox("Physarum", &params.physarumEnabled);
+                    if (ImGui::TreeNodeEx("Physarum Settings", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        ImGui::Spacing();
                             if (params.physarumEnabled) {
                                 ImGui::Spacing();
                                 ImGui::SliderFloat("Force Intensity", &params.physarumIntensity, 0.0f, 5.0f, "%.2f");
@@ -630,6 +688,39 @@ int main(int argc, char **argv)
 
                         ImGui::Spacing();
                         
+                        // --- Boids ---
+                        ImGui::Checkbox("Boids", &params.boidsEnabled);
+                        if (ImGui::TreeNode("Boids Settings"))
+                        {
+                            ImGui::Spacing();
+                            if (params.boidsEnabled) {
+                                ImGui::SliderFloat("Alignment", &params.alignment, 0.0f, 2.0f);
+                                ImGui::SliderFloat("Separation", &params.separation, 0.0f, 2.0f);
+                                ImGui::SliderFloat("Cohesion", &params.cohesion, 0.0f, 2.0f);
+                                ImGui::SliderFloat("Radius", &params.radius, 10.0f, 100.0f);
+                            } else {
+                                ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "Abilita Boids per modificare i parametri");
+                            }
+                            ImGui::Spacing();
+                            ImGui::TreePop();
+                        }
+                        
+                        ImGui::Spacing();
+                        
+                        // --- Physics ---
+                        if (ImGui::TreeNodeEx("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            ImGui::Spacing();
+                            ImGui::SliderFloat("Inertia", &params.inertia, 0.0f, 0.99f, "%.2f");
+                            ImGui::DragFloat("Speed min", &params.speedMin, 1.0f, 0.0f, params.speedMax - 1.0f, "%.0f", ImGuiSliderFlags_AlwaysClamp);
+                            ImGui::DragFloat("Speed max", &params.speedMax, 5.0f, params.speedMin + 1.0f, 1e9f, "%.0f", ImGuiSliderFlags_AlwaysClamp);
+                            ImGui::DragFloat("Base speed", &params.speed, 5.0f, params.speedMin, params.speedMax, "%.0f", ImGuiSliderFlags_AlwaysClamp);
+                            ImGui::Spacing();
+                            ImGui::TreePop();
+                        }
+                        
+                        ImGui::Spacing();
+                        
                         // --- Collisions ---
                         if (ImGui::TreeNode("Collisions"))
                         {
@@ -643,23 +734,15 @@ int main(int argc, char **argv)
 
                         ImGui::Spacing();
 
-                        // --- Boundaries / Topology ---
-                        if (ImGui::TreeNode("Boundary Topology"))
-                        {
-                            static const char* boundaryOptions[] = {
-                                "Toroidal wrap (current)",
-                                "Rigid bounce (reflect)",
-                                "Klein X (wrap X, flip Y)",
-                                "Klein Y (wrap Y, flip X)"
-                            };
+                        // --- Boundary / Topology --- (direct)
+                        static const char* boundaryOptions[] = {
+                            "Toroidal wrap",
+                            "Rigid bounce (reflect)",
+                            "Klein bottle (full twist)"
+                        };
 
-                            ImGui::Spacing();
-                            ImGui::Combo("Mode", &params.boundaryMode, boundaryOptions, IM_ARRAYSIZE(boundaryOptions));
-                            ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Scegli come i bordi collegano lo spazio");
-                            ImGui::Spacing();
-                            ImGui::TreePop();
-                        }
-
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Boundary / Topology");
+                        ImGui::Combo("##BoundaryMode", &params.boundaryMode, boundaryOptions, IM_ARRAYSIZE(boundaryOptions));
                         ImGui::Spacing();
                         
                         
@@ -734,69 +817,45 @@ int main(int argc, char **argv)
 
                     ImGui::Spacing();
 
-                    // ========== BOIDS FLOCKING ==========
-                    if (ImGui::CollapsingHeader("[ BOIDS FLOCKING ]"))
-                    {
-                        ImGui::Indent(10);
-                        ImGui::Spacing();
-                        ImGui::Checkbox("Enable Boids", &params.boidsEnabled);
-                        if (params.boidsEnabled) {
-                            ImGui::SliderFloat("Alignment", &params.alignment, 0.0f, 2.0f);
-                            ImGui::SliderFloat("Separation", &params.separation, 0.0f, 2.0f);
-                            ImGui::SliderFloat("Cohesion", &params.cohesion, 0.0f, 2.0f);
-                            ImGui::SliderFloat("Radius", &params.radius, 10.0f, 100.0f);
-                        }
-                        ImGui::Spacing();
-                        ImGui::Unindent(10);
-                    }
-
-                    ImGui::Spacing();
-
-                    // ========== MOTION ==========
-                    if (ImGui::CollapsingHeader("[ MOTION ]"))
-                    {
-                        ImGui::Indent(10);
-                        ImGui::Spacing();
-                        ImGui::SliderFloat("Inertia", &params.inertia, 0.0f, 0.99f, "%.2f");
-                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "0 = sterzo immediato, 1 = forte inerzia");
-                        ImGui::Spacing();
-                        ImGui::Unindent(10);
-                    }
-
-                    ImGui::Spacing();
-
                     // ========== MOUSE EFFECTS ==========
                     if (ImGui::CollapsingHeader("[ MOUSE EFFECTS ]", ImGuiTreeNodeFlags_DefaultOpen))
                     {
                         ImGui::Indent(10);
                         ImGui::Spacing();
-                        ImGui::RadioButton("Attract", &params.mouseMode, 0);
-                        ImGui::RadioButton("Repel", &params.mouseMode, 1);
-                        ImGui::RadioButton("Ring (Attract+Repel)", &params.mouseMode, 2);
-                        ImGui::RadioButton("Vortex (Perpendicular)", &params.mouseMode, 3);
+                        ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Comportamento");
+                        ImGui::RadioButton("Attract", &params.mouseMode, 0); ImGui::SameLine();
+                        ImGui::RadioButton("Repel", &params.mouseMode, 1); ImGui::SameLine();
+                        ImGui::RadioButton("Ring", &params.mouseMode, 2); ImGui::SameLine();
+                        ImGui::RadioButton("Vortex", &params.mouseMode, 3);
+                        ImGui::Spacing();
+
+                        static const char* falloffNames[] = { "1/r", "1/r^2", "1/r^3", "Gaussian", "Oscillatory" };
+                        ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Legge di forza");
+                        ImGui::Combo("##MouseFalloff", &params.mouseFalloff, falloffNames, IM_ARRAYSIZE(falloffNames));
+                        ImGui::SliderFloat("Strength", &params.mouseStrength, 0.0f, 10.0f, "%.2f");
+                        if (params.mouseFalloff == 3) {
+                            ImGui::SliderFloat("Gaussian sigma (px)", &params.mouseGaussianSigma, 10.0f, 2000.0f, "%.0f");
+                        }
+                        if (params.mouseFalloff == 4) {
+                            ImGui::SliderFloat("Osc freq (cycles/px)", &params.mouseOscFreq, 0.01f, 5.0f, "%.3f");
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Checkbox("Ring overlay (attr+rep)", &params.mouseRingOverlay);
+                        if (params.mouseRingOverlay || params.mouseMode == 2) {
+                            ImGui::SliderFloat("Ring radius", &params.mouseRingRadius, 50.0f, 2000.0f, "%.0f px");
+                        }
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "L'effetto ora agisce su tutta l'area, con decadimento scelto.");
                         ImGui::Spacing();
                         ImGui::Unindent(10);
                     }
 
                     ImGui::Spacing();
 
-                    // ========== PARTICLE MANAGEMENT ==========
-                    if (ImGui::CollapsingHeader("[ PARTICLES ]"))
-                    {
-                        ImGui::Indent(10);
-                        ImGui::Spacing();
-                        int maxCount = simulation.getMaxParticleCount();
-                        params.targetParticleCount = std::clamp(params.targetParticleCount, 10000, maxCount);
-                        ImGui::TextColored(ImVec4(0.7f, 0.8f, 0.7f, 1.0f), "Active: %d / %d", simulation.getParticleCount(), maxCount);
-                        ImGui::SliderInt("Particle Count", &params.targetParticleCount, 10000, maxCount, "%d", ImGuiSliderFlags_AlwaysClamp);
-                        ImGui::TextColored(ImVec4(0.7f, 0.6f, 0.4f, 1.0f), "Cambia live senza riavviare");
-                        ImGui::Spacing();
-                        ImGui::Unindent(10);
-                    }
-                    
                     ImGui::PopStyleColor(3);
                     
                     ImGui::EndChild(); // End scrollable region
+                    ImGui::PopItemWidth();
                 }
                 ImGui::End();
                 ImGui::PopStyleVar();
@@ -818,6 +877,7 @@ int main(int argc, char **argv)
             simulation.setSensorDistance(params.sensorDistance);
             simulation.setSensorAngle(params.sensorAngle);
             simulation.setTurnAngle(params.turnAngle);
+            simulation.setSpeedRange(params.speedMin, params.speedMax);
             simulation.setSpeed(params.speed);
             simulation.setTrailFade(params.trailFade);
             simulation.setToneExposure(params.toneExposure);
@@ -832,6 +892,12 @@ int main(int argc, char **argv)
             simulation.setCollisionsEnabled(params.collisionsEnabled);
             simulation.setCollisionRadius(params.collisionRadius);
             simulation.setBoundaryMode(params.boundaryMode);
+            simulation.setMouseFalloff(params.mouseFalloff);
+            simulation.setMouseStrength(params.mouseStrength);
+            simulation.setMouseGaussianSigma(params.mouseGaussianSigma);
+            simulation.setMouseOscFreq(params.mouseOscFreq);
+            simulation.setMouseRingOverlay(params.mouseRingOverlay);
+            simulation.setMouseRingRadius(params.mouseRingRadius);
             
             // Colors
             simulation.setColor1(params.color1[0], params.color1[1], params.color1[2]);

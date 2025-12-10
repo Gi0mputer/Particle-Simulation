@@ -39,7 +39,14 @@ public:
     void setTurnAngle(float val) { m_turnAngle = val; }
     
     float getSpeed() const { return m_speed; }
-    void setSpeed(float val) { m_speed = val; }
+    void setSpeed(float val) { m_speed = std::clamp(val, m_speedMin, m_speedMax); }
+    float getSpeedMin() const { return m_speedMin; }
+    float getSpeedMax() const { return m_speedMax; }
+    void setSpeedRange(float minVal, float maxVal) {
+        m_speedMin = std::max(0.0f, minVal);
+        m_speedMax = std::max(m_speedMin + 1.0f, maxVal);
+        m_speed = std::clamp(m_speed, m_speedMin, m_speedMax);
+    }
 
     // Trails / post
     float getTrailFade() const { return m_trailFade; }
@@ -64,7 +71,7 @@ public:
 
     // Boundary topology: 0=Toroidal, 1=Bounce, 2=Klein X-flip, 3=Klein Y-flip
     int  getBoundaryMode() const { return m_boundaryMode; }
-    void setBoundaryMode(int mode) { m_boundaryMode = (mode < 0) ? 0 : (mode > 3 ? 3 : mode); }
+    void setBoundaryMode(int mode) { m_boundaryMode = (mode < 0) ? 0 : (mode > 2 ? 2 : mode); }
     
     // Physarum enable/disable
     bool isPhysarumEnabled() const { return m_physarumEnabled; }
@@ -94,6 +101,14 @@ public:
     bool getCollisionsEnabled() const { return m_collisionsEnabled; }
     void setCollisionRadius(float radius) { m_collisionRadius = radius; }
     float getCollisionRadius() const { return m_collisionRadius; }
+
+    // Mouse forces
+    void setMouseFalloff(int type) { m_mouseFalloff = type; }
+    void setMouseStrength(float s) { m_mouseStrength = s; }
+    void setMouseGaussianSigma(float s) { m_mouseGaussianSigma = s; }
+    void setMouseOscFreq(float f) { m_mouseOscFreq = f; }
+    void setMouseRingOverlay(bool enabled) { m_mouseRingOverlay = enabled; }
+    void setMouseRingRadius(float r) { m_mouseRingRadius = r; }
 
     // Colors
     void setColor1(float r, float g, float b) { m_color1[0]=r; m_color1[1]=g; m_color1[2]=b; }
@@ -146,6 +161,8 @@ private:
     float m_sensorDistance;
     float m_sensorAngle;
     float m_turnAngle;
+    float m_speedMin;
+    float m_speedMax;
     float m_speed;
     float m_trailFade;
     float m_toneExposure;
@@ -169,6 +186,14 @@ private:
     float m_boidsRadius;  // Interaction radius
     bool  m_collisionsEnabled;
     float m_collisionRadius;
+
+    // Mouse forces
+    int   m_mouseFalloff;
+    float m_mouseStrength;
+    float m_mouseGaussianSigma;
+    float m_mouseOscFreq;
+    bool  m_mouseRingOverlay;
+    float m_mouseRingRadius;
     
     // Colors
     float m_color1[3];

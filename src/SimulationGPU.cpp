@@ -57,6 +57,8 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_sensorDistance(20.0f)
     , m_sensorAngle(0.785f)
     , m_turnAngle(0.785f)
+    , m_speedMin(10.0f)
+    , m_speedMax(300.0f)
     , m_speed(100.0f)
     , m_trailFade(0.99f)
     , m_toneExposure(3.0f)
@@ -86,6 +88,12 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_boidsRadius(50.0f)
     , m_collisionsEnabled(false)
     , m_collisionRadius(30.0f)
+    , m_mouseFalloff(1)
+    , m_mouseStrength(1.0f)
+    , m_mouseGaussianSigma(250.0f)
+    , m_mouseOscFreq(0.5f)
+    , m_mouseRingOverlay(false)
+    , m_mouseRingRadius(400.0f)
     , m_gridWidth(0)
     , m_gridHeight(0)
     , m_cellSize(40.0f)
@@ -162,9 +170,8 @@ void SimulationGPU::setActiveParticleCount(int count)
             particles[i].position[1] = static_cast<float>(rand() % m_height);
             particles[i].angle = static_cast<float>(rand()) / RAND_MAX * 6.28318530718f;
 
-            float minSpeed = 10.0f, maxSpeed = 100.0f;
             float r = static_cast<float>(rand()) / RAND_MAX;
-            particles[i].speed = minSpeed + r*(maxSpeed - minSpeed);
+            particles[i].speed = m_speedMin + r * (m_speedMax - m_speedMin);
         }
 
         GLintptr offset = static_cast<GLintptr>(start) * sizeof(GpuParticle);
@@ -235,6 +242,8 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSensorAngle"), m_sensorAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uTurnAngle"), m_turnAngle);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeed"), m_speed);
+        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeedMin"), m_speedMin);
+        glUniform1f(glGetUniformLocation(m_updateProgramID, "uSpeedMax"), m_speedMax);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uInertia"), m_inertia);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uRestitution"), m_restitution);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uRandomWeight"), m_randomWeight);
@@ -277,6 +286,12 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUniform2f(glGetUniformLocation(m_updateProgramID, "uMousePos"), mouseX, mouseY);
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uMousePressed"), mousePressed ? 1 : 0);
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uMouseMode"), mouseMode);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uMouseFalloff"), m_mouseFalloff);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uMouseStrength"), m_mouseStrength);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uMouseGaussianSigma"), m_mouseGaussianSigma);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uMouseOscFreq"), m_mouseOscFreq);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uMouseRingOverlay"), m_mouseRingOverlay ? 1 : 0);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uMouseRingRadius"), m_mouseRingRadius);
 
        int nextBuffer = 1 - m_currentBuffer;
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_particleBuffers[m_currentBuffer]);
@@ -465,9 +480,8 @@ void SimulationGPU::initializeParticles()
 
         particles[i].angle = static_cast<float>(rand()) / RAND_MAX * 6.28318530718f;
 
-        float minSpeed = 10.0f, maxSpeed = 100.0f;
         float r = static_cast<float>(rand()) / RAND_MAX;
-        particles[i].speed = minSpeed + r*(maxSpeed - minSpeed);
+        particles[i].speed = m_speedMin + r * (m_speedMax - m_speedMin);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[0]);
