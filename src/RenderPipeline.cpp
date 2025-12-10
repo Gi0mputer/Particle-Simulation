@@ -47,6 +47,10 @@ void RenderPipeline::finalPass(const SimulationGPU& simulation)
     glClearColor(m_backgroundColor[0], m_backgroundColor[1], m_backgroundColor[2], 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // Durante il full-screen quad disabilitiamo il blending per evitare che l'alpha del trail scurisca i colori.
+    GLboolean wasBlendEnabled = glIsEnabled(GL_BLEND);
+    if (wasBlendEnabled) glDisable(GL_BLEND);
+
     m_finalShader.use();
 
     // Riceviamo dal simulation (compute shader) l'ID della texture su cui ha fatto blur e calcoli di color
@@ -65,8 +69,11 @@ void RenderPipeline::finalPass(const SimulationGPU& simulation)
     glUniform3fv(glGetUniformLocation(m_finalShader.getID(), "uColor2"), 1, m_color2);
     glUniform1f(glGetUniformLocation(m_finalShader.getID(), "uNeonSpeed"), m_neonSpeed);
     glUniform1f(glGetUniformLocation(m_finalShader.getID(), "uNeonRange"), m_neonRange);
+    glUniform3fv(glGetUniformLocation(m_finalShader.getID(), "uBackgroundColor"), 1, m_backgroundColor);
 
     renderQuad();
+
+    if (wasBlendEnabled) glEnable(GL_BLEND);
 }
 
 void RenderPipeline::setupQuadVAO()

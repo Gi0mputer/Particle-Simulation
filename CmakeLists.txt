@@ -37,6 +37,9 @@ add_executable(ParticleSimulation ${SOURCES})
 
 # Collega GLFW, OpenGL e GLAD
 target_link_libraries(ParticleSimulation PRIVATE glfw imgui::imgui OpenGL::GL)
+if (WIN32)
+    target_link_libraries(ParticleSimulation PRIVATE dxgi)
+endif()
 
 # Copia la cartella "shaders" nella directory di output
 add_custom_command(TARGET ParticleSimulation POST_BUILD

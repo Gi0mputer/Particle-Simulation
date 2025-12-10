@@ -104,6 +104,17 @@ public:
     // Advanced Color Behavior
     void setColorOffset(float val) { m_colorOffset = val; }
     float getColorOffset() const { return m_colorOffset; }
+    void setColorSource(int src) { m_colorSource = (src < 0) ? 0 : (src > 2 ? 2 : src); }
+    int  getColorSource() const { return m_colorSource; }
+    void setColorSpeedRange(float minVal, float maxVal) { 
+        m_colorSpeedMin = minVal; 
+        m_colorSpeedMax = std::max(maxVal, minVal + 1.0f); 
+    }
+    float getColorSpeedMin() const { return m_colorSpeedMin; }
+    float getColorSpeedMax() const { return m_colorSpeedMax; }
+    float getAutoColorSpeedMin() const { return m_autoSpeedMin; }
+    float getAutoColorSpeedMax() const { return m_autoSpeedMax; }
+    bool  hasAutoSpeedStats() const { return m_autoSpeedValid; }
 
 private:
     void createComputeShaders();
@@ -163,6 +174,15 @@ private:
     float m_color1[3];
     float m_color2[3];
     float m_colorOffset;
+    int   m_colorSource;     // 0=angle, 1=speed manual, 2=speed auto
+    float m_colorSpeedMin;
+    float m_colorSpeedMax;
+    float m_autoSpeedMin;
+    float m_autoSpeedMax;
+    bool  m_autoSpeedValid;
+    float m_speedSampleInterval;
+    float m_speedSampleTimer;
+    int   m_speedSampleCount;
 
     // Spatial Grid for Boids (Atomic Linked List)
     int m_gridWidth;

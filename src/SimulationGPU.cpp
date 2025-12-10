@@ -70,6 +70,15 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_physarumEnabled(false)
     , m_physarumIntensity(1.0f)
     , m_colorOffset(0.0f) // New
+    , m_colorSource(0)
+    , m_colorSpeedMin(0.0f)
+    , m_colorSpeedMax(300.0f)
+    , m_autoSpeedMin(0.0f)
+    , m_autoSpeedMax(1.0f)
+    , m_autoSpeedValid(false)
+    , m_speedSampleInterval(3.0f)
+    , m_speedSampleTimer(0.0f)
+    , m_speedSampleCount(4096)
     , m_boidsEnabled(false)
     , m_alignmentWeight(1.0f)
     , m_separationWeight(1.2f)
@@ -176,6 +185,8 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
     if (!m_initialized) return;
     
     const int activeCount = m_activeParticles;
+    m_speedSampleTimer += dt;
+    bool shouldSampleSpeed = (m_colorSource == 2 && m_speedSampleTimer >= m_speedSampleInterval);
 
     // 0. Start Timer
     glQueryCounter(m_timeQueries[0], GL_TIMESTAMP);
@@ -232,6 +243,19 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor1"), 1, m_color1);
        glUniform3fv(glGetUniformLocation(m_updateProgramID, "uColor2"), 1, m_color2);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uColorOffset"), m_colorOffset);
+       glUniform1i(glGetUniformLocation(m_updateProgramID, "uColorSource"), m_colorSource == 0 ? 0 : 1);
+
+       float effectiveMin = m_colorSpeedMin;
+       float effectiveMax = m_colorSpeedMax;
+       if (m_colorSource == 2 && m_autoSpeedValid) {
+           effectiveMin = m_autoSpeedMin;
+           effectiveMax = m_autoSpeedMax;
+       }
+       if (effectiveMax <= effectiveMin) {
+           effectiveMax = effectiveMin + 1.0f;
+       }
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uColorSpeedMin"), effectiveMin);
+       glUniform1f(glGetUniformLocation(m_updateProgramID, "uColorSpeedMax"), effectiveMax);
 
        glUniform1i(glGetUniformLocation(m_updateProgramID, "uCollisionsEnabled"), m_collisionsEnabled ? 1 : 0);
        glUniform1f(glGetUniformLocation(m_updateProgramID, "uCollisionRadius"), m_collisionRadius);
@@ -266,6 +290,28 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
 
        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
        m_currentBuffer = nextBuffer;
+    }
+    if (shouldSampleSpeed) {
+        m_speedSampleTimer = 0.0f;
+        int sampleCount = std::min(m_activeParticles, m_speedSampleCount);
+        if (sampleCount > 0) {
+            std::vector<GpuParticle> sample(sampleCount);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[m_currentBuffer]);
+            glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, static_cast<GLsizeiptr>(sampleCount * sizeof(GpuParticle)), sample.data());
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+            float minS = sample[0].speed;
+            float maxS = sample[0].speed;
+            for (int i = 1; i < sampleCount; ++i) {
+                float s = sample[i].speed;
+                if (s < minS) minS = s;
+                if (s > maxS) maxS = s;
+            }
+            if (maxS <= minS) maxS = minS + 1.0f;
+            m_autoSpeedMin = minS;
+            m_autoSpeedMax = maxS;
+            m_autoSpeedValid = true;
+        }
     }
     
     // 2. Update Done

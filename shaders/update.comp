@@ -68,6 +68,9 @@ uniform int  uMouseMode; // 0=Attract, 1=Repel, 2=Ring, 3=Vortex
 uniform vec3 uColor1;
 uniform vec3 uColor2;
 uniform float uColorOffset;
+uniform int   uColorSource;     // 0=angle, 1=speed (manual/auto precomputato lato CPU)
+uniform float uColorSpeedMin;
+uniform float uColorSpeedMax;
 
 // Helper: RGB to HSV
 vec3 rgb2hsv(vec3 c) {
@@ -481,7 +484,19 @@ void main()
     ivec2 coord = ivec2(p.position);
     
     // New Color Logic: Adaptive
-    vec3 rgb;
+    // Base factor: angle or speed
+    float colorFactor = 0.0;
+    if (uColorSource == 0) {
+        // Smooth wrap: 0 deg -> color1, 180 deg -> color2, 360 deg -> color1
+        colorFactor = 0.5 * (1.0 - cos(p.angle));
+    } else {
+        float cMin = uColorSpeedMin;
+        float cMax = max(uColorSpeedMax, cMin + 0.001);
+        colorFactor = clamp((p.speed - cMin) / (cMax - cMin), 0.0, 1.0);
+    }
+    vec3 basePalette = mix(uColor1, uColor2, colorFactor);
+
+    vec3 rgb = basePalette;
     if (uColorOffset > 0.001) {
         // "Chameleon" adaptive coloring
         // Sample what is ahead
@@ -490,9 +505,8 @@ void main()
         vec3 seenCol = imageLoad(outImage, ivec2(posF)).rgb; 
         
         if (length(seenCol) < 0.1) {
-             // If dark, default to standard angle-based color
-             float factor = fract(p.angle / (2.0 * PI));
-             rgb = mix(uColor1, uColor2, factor);
+             // If dark, fallback to base palette
+             rgb = basePalette;
         } else {
              // Shift Hue of seen color
              vec3 hsv = rgb2hsv(seenCol);
@@ -501,10 +515,6 @@ void main()
              hsv.z = 1.0;                         // Full brightness
              rgb = hsv2rgb(hsv);
         }
-    } else {
-        // Standard
-        float factor = fract(p.angle / (2.0 * PI));
-        rgb = mix(uColor1, uColor2, factor);
     }
     
     float depositAmount = 0.05 * uPhysarumIntensity;

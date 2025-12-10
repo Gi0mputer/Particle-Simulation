@@ -6,6 +6,8 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <vector>
+#include <cstdio>
 
 // ImGui
 #include <imgui.h>
@@ -20,6 +22,7 @@
 #include "WindowManager.h"
 #include "RenderPipeline.h"
 #include "SimulationGPU.h"
+#include "GpuDiagnostics.h"
 #include "Utils.h"
 #include "InputHandler.h"
 
@@ -27,6 +30,11 @@ int main(int argc, char **argv)
 {
     try
     {
+        // 0. GPU DIAGNOSTICS (prima di creare la finestra)
+        const auto gpuAdapters = Utils::enumerateGpuAdapters();
+        const auto preferredGpu = Utils::pickBestGpu(gpuAdapters);
+        Utils::logGpuAdapters(gpuAdapters, preferredGpu);
+
         //// 1. WINDOW CONTEXT
         WindowManager windowManager("Particle Simulation");
         GLFWwindow *window = windowManager.getWindow();
@@ -157,6 +165,9 @@ int main(int argc, char **argv)
             float color2[3] = {1.0f, 0.0f, 1.0f};
             float backgroundColor[3] = {0.0f, 0.0f, 0.0f};
             float colorOffset = 0.0f;
+            int   colorSource = 0;       // 0=angle, 1=speed manual, 2=speed auto
+            float colorSpeedMin = 0.0f;
+            float colorSpeedMax = 300.0f;
             int   colorMode = 0;
             float neonSpeed = 1.0f;
             float neonRange = 1.0f;
@@ -191,6 +202,19 @@ int main(int argc, char **argv)
         const std::string configDir = "configs";
         const std::string defaultConfigPath = configDir + "/default.cfg";
         const Utils::HardwareInfo hardwareInfo = Utils::getHardwareInfo();
+        if (!hardwareInfo.renderer.empty())
+        {
+            std::cout << "[GPU] Renderer OpenGL attivo: " << hardwareInfo.renderer << std::endl;
+        }
+        const bool usingPreferredGpu = preferredGpu && Utils::rendererMatchesAdapter(*preferredGpu, hardwareInfo.renderer);
+        const std::string preferredGpuLabel = preferredGpu
+            ? preferredGpu->name + " (" + Utils::formatMemoryMB(preferredGpu->dedicatedMemory) + ")"
+            : "non rilevata";
+        if (preferredGpu && !usingPreferredGpu)
+        {
+            std::cout << "[GPU] Attenzione: stai renderizzando con \"" << hardwareInfo.renderer
+                      << "\" ma la GPU consigliata e' \"" << preferredGpu->name << "\"." << std::endl;
+        }
         const std::string hardwarePresetName = Utils::makeHardwarePresetName(hardwareInfo);
         const std::string hardwarePresetPath = configDir + "/" + hardwarePresetName + ".cfg";
         std::string currentPresetLabel = "default (non salvato)";
@@ -227,6 +251,9 @@ int main(int argc, char **argv)
             for (int i = 0; i < 3; ++i) {
                 p.backgroundColor[i] = std::clamp(p.backgroundColor[i], 0.0f, 1.0f);
             }
+            p.colorSource = std::clamp(p.colorSource, 0, 2);
+            p.colorSpeedMin = std::clamp(p.colorSpeedMin, 0.0f, 2000.0f);
+            p.colorSpeedMax = std::clamp(p.colorSpeedMax, p.colorSpeedMin + 1.0f, 5000.0f);
         };
 
         auto saveParamsToFile = [&](const SimulationParams& p, const std::string& path) -> bool {
@@ -254,6 +281,9 @@ int main(int argc, char **argv)
                 out << "color2 " << data.color2[0] << " " << data.color2[1] << " " << data.color2[2] << "\n";
                 out << "backgroundColor " << data.backgroundColor[0] << " " << data.backgroundColor[1] << " " << data.backgroundColor[2] << "\n";
                 out << "colorOffset " << data.colorOffset << "\n";
+                out << "colorSource " << data.colorSource << "\n";
+                out << "colorSpeedMin " << data.colorSpeedMin << "\n";
+                out << "colorSpeedMax " << data.colorSpeedMax << "\n";
                 out << "colorMode " << data.colorMode << "\n";
                 out << "neonSpeed " << data.neonSpeed << "\n";
                 out << "neonRange " << data.neonRange << "\n";
@@ -297,6 +327,9 @@ int main(int argc, char **argv)
                 else if (key == "color2") iss >> p.color2[0] >> p.color2[1] >> p.color2[2];
                 else if (key == "backgroundColor") iss >> p.backgroundColor[0] >> p.backgroundColor[1] >> p.backgroundColor[2];
                 else if (key == "colorOffset") iss >> p.colorOffset;
+                else if (key == "colorSource") iss >> p.colorSource;
+                else if (key == "colorSpeedMin") iss >> p.colorSpeedMin;
+                else if (key == "colorSpeedMax") iss >> p.colorSpeedMax;
                 else if (key == "colorMode") iss >> p.colorMode;
                 else if (key == "neonSpeed") iss >> p.neonSpeed;
                 else if (key == "neonRange") iss >> p.neonRange;
@@ -453,8 +486,55 @@ int main(int argc, char **argv)
                         ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente: %s", currentPresetLabel.c_str());
                         ImGui::TextColored(ImVec4(0.6f,0.6f,0.6f,1.0f), "%s", presetStatus.c_str());
                         ImGui::TextColored(ImVec4(0.6f,0.75f,0.9f,1.0f), "Profilo hardware: %s.cfg", hardwarePresetName.c_str());
-                        ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "GPU: %s", hardwareInfo.renderer.c_str());
+                        ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "GPU in uso (OpenGL): %s", hardwareInfo.renderer.c_str());
+                        if (preferredGpu)
+                        {
+                            ImGui::TextColored(ImVec4(0.55f,0.65f,0.75f,1.0f), "GPU preferita: %s", preferredGpuLabel.c_str());
+                            if (!usingPreferredGpu)
+                            {
+                                ImGui::TextColored(ImVec4(0.95f,0.65f,0.25f,1.0f), "ATTENZIONE: forza GPU dedicata nelle impostazioni Windows.");
+                            }
+                        }
+                        else
+                        {
+                            ImGui::TextColored(ImVec4(0.8f,0.5f,0.5f,1.0f), "GPU preferita non rilevata");
+                        }
                         ImGui::Spacing();
+                        // Lista preset disponibili (scrollabile)
+                        {
+                            std::vector<std::string> presetList;
+                            try {
+                                for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
+                                    if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
+                                        presetList.push_back(entry.path().filename().string());
+                                    }
+                                }
+                                std::sort(presetList.begin(), presetList.end());
+                            } catch (...) {
+                                // ignore errors
+                            }
+                            ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset salvati");
+                            ImGui::BeginChild("PresetList", ImVec2(0, 150), true);
+                            for (const auto& name : presetList) {
+                                bool isCurrent = (currentPresetLabel == name || currentPresetLabel == (configDir + "/" + name));
+                                if (ImGui::Selectable(name.c_str(), isCurrent)) {
+                                    std::string stem = std::filesystem::path(name).stem().string();
+                                    std::snprintf(presetNameBuf, IM_ARRAYSIZE(presetNameBuf), "%s", stem.c_str());
+                                }
+                                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
+                                    std::string path = std::string(configDir) + "/" + name;
+                                    if (loadParamsFromFile(params, path)) {
+                                        currentPresetLabel = path;
+                                        presetStatus = "Caricato " + path;
+                                    } else {
+                                        presetStatus = "Impossibile caricare " + path;
+                                    }
+                                }
+                            }
+                            ImGui::EndChild();
+                            ImGui::Spacing();
+                        }
+
                         ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
                         ImGui::Spacing();
                         if (ImGui::Button("Carica preset", ImVec2(150, 40))) {
@@ -604,6 +684,28 @@ int main(int argc, char **argv)
                         ImGui::SliderFloat("Mutation Offset", &params.colorOffset, 0.0f, 0.5f, "%.2f");
                         ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "0=Fisso, 0.5=Complementare");
                         ImGui::Spacing();
+
+                        ImGui::Separator();
+                        static const char* colorSources[] = { "Direzione (0° -> A, 180° -> B, 360° -> A)", "Modulo velocit\u00e0 (range manuale)", "Modulo velocit\u00e0 (range auto)" };
+                        ImGui::Combo("Color Source", &params.colorSource, colorSources, IM_ARRAYSIZE(colorSources));
+                        if (params.colorSource == 1) {
+                            ImGui::Indent(10);
+                            ImGui::SliderFloat("Speed min (color)", &params.colorSpeedMin, 0.0f, 1000.0f, "%.0f");
+                            ImGui::SliderFloat("Speed max (color)", &params.colorSpeedMax, params.colorSpeedMin + 1.0f, 1500.0f, "%.0f");
+                            ImGui::Unindent(10);
+                        } else if (params.colorSource == 2) {
+                            ImGui::Indent(10);
+                            float autoMin = simulation.getAutoColorSpeedMin();
+                            float autoMax = simulation.getAutoColorSpeedMax();
+                            bool hasStats = simulation.hasAutoSpeedStats();
+                            if (hasStats) {
+                                ImGui::TextColored(ImVec4(0.7f,0.8f,0.7f,1.0f), "Auto range: %.1f - %.1f", autoMin, autoMax);
+                            } else {
+                                ImGui::TextColored(ImVec4(0.7f,0.6f,0.4f,1.0f), "Auto range in stima...");
+                            }
+                            ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "Campione %d particelle ogni %.0f s", 4096, 3.0f);
+                            ImGui::Unindent(10);
+                        }
                         
                         ImGui::Separator();
                         static const char* colorModes[] = { "Standard", "Legacy Supernova", "Neon Thermal", "Bismuth Iridescent", "Psycho Overflow" };
@@ -706,6 +808,8 @@ int main(int argc, char **argv)
             renderPipeline.setColors(params.color1, params.color2);
             renderPipeline.setNeonParams(params.neonSpeed, params.neonRange);
             renderPipeline.setBackgroundColor(params.backgroundColor);
+            simulation.setColorSource(params.colorSource);
+            simulation.setColorSpeedRange(params.colorSpeedMin, params.colorSpeedMax);
 
             // --- UPDATE SIMULATION PARAMETERS FROM UI ---
             simulation.setColorOffset(params.colorOffset);

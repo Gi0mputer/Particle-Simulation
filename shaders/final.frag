@@ -10,6 +10,7 @@ uniform vec3  uColor1;
 uniform vec3  uColor2;
 uniform float uNeonSpeed;
 uniform float uNeonRange;
+uniform vec3  uBackgroundColor;
 
 // Helper: HSV to RGB
 vec3 hsv2rgb(vec3 c) {
@@ -26,25 +27,27 @@ vec3 palette( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
 void main()
 {
     vec4 texVal = texture(uTexture, vTexCoord);
+    float alpha = clamp(texVal.a, 0.0, 1.0);
     
     // Global Density Estimation (using Red channel)
     float density = texVal.r; 
+    vec3 baseColor = texVal.rgb;
     
     if (uColorMode == 0) {
         // Standard
-        FragColor = vec4(texVal.rgb, 1.0);
+        baseColor = texVal.rgb;
     } 
     else if (uColorMode == 1) {
         // Legacy Supernova (Fire Ball 2.0)
         float g = density * 255.0; 
         if (g < 1.0) {
-            FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            baseColor = vec3(0.0);
         } else {
             float term1 = sqrt(max(g * 0.05 - 1.0, 0.0)) * 0.05;
             float term2 = 0.71 + 0.01 * cos(0.1 * g + uTime * uNeonSpeed);
             float h = min(term1, term2);
             vec3 rgb = hsv2rgb(vec3(h, 1.0, 1.0));
-            FragColor = vec4(rgb, 1.0);
+            baseColor = rgb;
         }
     }
     else if (uColorMode == 2) {
@@ -58,7 +61,7 @@ void main()
         
         // Intensity mapping
         col *= (density * 5.0); 
-        FragColor = vec4(col, 1.0);
+        baseColor = col;
     }
     else if (uColorMode == 3) {
         // Bismuth / Iridescent
@@ -72,7 +75,7 @@ void main()
         vec3 d = vec3(0.00, 0.33, 0.67);
         
         vec3 col = palette(t * uNeonRange * 5.0, a, b, c, d);
-        FragColor = vec4(col * density, 1.0);
+        baseColor = col * density;
     }
      else if (uColorMode == 4) {
         // Psycho (Overflow)
@@ -80,9 +83,9 @@ void main()
         float val = density * 255.0;
         float cyclic = fract((val + gl_FragCoord.x * 0.1 + uTime * uNeonSpeed * 100.0) / 255.0 * uNeonRange * 5.0);
         vec3 col = hsv2rgb(vec3(cyclic, 1.0, 1.0));
-        FragColor = vec4(col * density, 1.0);
+        baseColor = col * density;
     }
-    else {
-        FragColor = vec4(texVal.rgb, 1.0);
-    }
+    
+    vec3 finalColor = mix(uBackgroundColor, baseColor, alpha);
+    FragColor = vec4(finalColor, 1.0);
 }
