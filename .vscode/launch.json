@@ -2,7 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Release (Ctrl+F5 per Run, F5 + task)",
+            "name": "Avvia (Richiede estensione 'CodeLLDB' - Drago)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/Release/ParticleSimulation.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Release (Complete)"
+        },
+        {
+            "name": "Avvia (Richiede estensione C/C++ Microsoft)",
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/Release/ParticleSimulation.exe",

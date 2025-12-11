@@ -6,7 +6,7 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/src",
-                "C:/vcpkg/installed/x64-windows/include"
+                "${workspaceFolder}/vcpkg_installed/x64-windows/include"
             ],
             "defines": [
                 "_DEBUG",
