@@ -636,7 +636,9 @@ int main(int argc, char **argv)
                                 ImGui::BeginChild("PresetList", ImVec2(0, 150), true);
                                 for (const auto& name : presetList) {
                                     bool isCurrent = (currentPresetLabel == name || currentPresetLabel == (configDir + "/" + name));
-                                    if (ImGui::Selectable(name.c_str(), isCurrent, ImGuiSelectableFlags_None, ImVec2(menuWidth - 100, 0))) { // Leave space for delete button
+                                    float availWidth = ImGui::GetContentRegionAvail().x;
+                                    float btnWidth = 30.0f;
+                                    if (ImGui::Selectable(name.c_str(), isCurrent, ImGuiSelectableFlags_None, ImVec2(availWidth - btnWidth - 5, 0))) { // Leave space for delete button
                                         std::string stem = std::filesystem::path(name).stem().string();
                                         std::snprintf(presetNameBuf, IM_ARRAYSIZE(presetNameBuf), "%s", stem.c_str());
                                     }
