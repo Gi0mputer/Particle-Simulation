@@ -22,10 +22,23 @@ static std::string readFile(const std::string& filePath)
     return buffer.str();
 }
 
-static GLuint compileShader(const std::string &source, GLenum shaderType)
+static GLuint compileShader(const std::string &source, GLenum shaderType, const std::string& defines = "")
 {
+    std::string finalSource = source;
+    if (!defines.empty()) {
+        size_t versionPos = finalSource.find("#version");
+        if (versionPos != std::string::npos) {
+            size_t eol = finalSource.find('\n', versionPos);
+            if (eol != std::string::npos) {
+                finalSource.insert(eol + 1, defines + "\n");
+            }
+        } else {
+            finalSource = defines + "\n" + finalSource;
+        }
+    }
+
     GLuint shader = glCreateShader(shaderType);
-    const char* src = source.c_str();
+    const char* src = finalSource.c_str();
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
 
@@ -48,6 +61,8 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_activeParticles(particleCount)
     , m_width(width)
     , m_height(height)
+    , m_targetParticles(particleCount)
+    , m_rampingUp(true)
     , m_initialized(false)
     , m_currentBuffer(0)
     , m_textureIDIn(0)
@@ -101,6 +116,7 @@ SimulationGPU::SimulationGPU(int particleCount, int width, int height)
     , m_particleNextBuffer(0)
     , m_gridResetProgramID(0)
     , m_gridBuildProgramID(0)
+    , m_textureFormat(TextureFormat::RGBA8)
 {
     m_color1[0] = 0.0f; m_color1[1] = 1.0f; m_color1[2] = 1.0f; // Cyan
     m_color2[0] = 1.0f; m_color2[1] = 0.0f; m_color2[2] = 1.0f; // Magenta
@@ -143,8 +159,10 @@ void SimulationGPU::initialize()
     }
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    // Inizializza le particelle nel buffer[0]
+    // Inizializza le particelle (all at center now for ramp-up)
     initializeParticles();
+    m_activeParticles = 0; // Start with 0
+    
     m_currentBuffer = 0;
 
     m_initialized = true;
@@ -183,7 +201,12 @@ void SimulationGPU::setActiveParticleCount(int count)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
 
-    m_activeParticles = clamped;
+    m_targetParticles = clamped;
+    // If we are ramping up, we just let the update loop handle it. 
+    // If not ramping (steady state), we might want to just set it effectively if reducing.
+    if (m_targetParticles < m_activeParticles) {
+        m_activeParticles = m_targetParticles;
+    }
 }
 
 // --------------------------------------------------
@@ -192,6 +215,22 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
     if (!m_initialized) return;
     
     const int activeCount = m_activeParticles;
+    
+    // Ramp Up Logic
+    if (activeCount < m_targetParticles) {
+        int growthRate = std::max(100, m_targetParticles / 100); // 1% per frame, min 100
+        int nextCount = std::min(activeCount + growthRate, m_targetParticles);
+        
+        // If we are adding particles, reset their position to center to get the "explosion" effect
+        if (nextCount > activeCount) {
+             resetParticlePositions(activeCount, nextCount - activeCount);
+             m_activeParticles = nextCount;
+        }
+    } else if (activeCount > m_targetParticles) {
+        // Immediate shrink if target is lower
+        m_activeParticles = m_targetParticles;
+    }
+
     m_speedSampleTimer += dt;
     bool shouldSampleSpeed = (m_colorSource == 2 && m_speedSampleTimer >= m_speedSampleInterval);
 
@@ -297,7 +336,11 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_particleBuffers[m_currentBuffer]);
        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_particleBuffers[nextBuffer]);
 
-       glBindImageTexture(2, m_textureIDIn, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
+        GLint glFormat = GL_RGBA8;
+        if (m_textureFormat == TextureFormat::R8) glFormat = GL_R8;
+        else if (m_textureFormat == TextureFormat::RG8) glFormat = GL_RG8;
+
+        glBindImageTexture(2, m_textureIDIn, 0, GL_FALSE, 0, GL_READ_WRITE, glFormat);
 
        GLuint groupSize = 128; 
        GLuint numGroups = (activeCount + groupSize - 1) / groupSize;
@@ -343,8 +386,12 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
        glUniform1f(glGetUniformLocation(m_blurProgramID, "uAutoDimStrength"), m_autoDimStrength);
        glUniform1f(glGetUniformLocation(m_blurProgramID, "uAutoDimGlobal"), m_autoDimGlobal);
 
-       glBindImageTexture(0, m_textureIDIn,  0, GL_FALSE, 0, GL_READ_ONLY,  GL_RGBA8);
-       glBindImageTexture(1, m_textureIDOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+       GLint glFormat = GL_RGBA8;
+       if (m_textureFormat == TextureFormat::R8) glFormat = GL_R8;
+       else if (m_textureFormat == TextureFormat::RG8) glFormat = GL_RG8;
+
+       glBindImageTexture(0, m_textureIDIn,  0, GL_FALSE, 0, GL_READ_ONLY,  glFormat);
+       glBindImageTexture(1, m_textureIDOut, 0, GL_FALSE, 0, GL_WRITE_ONLY, glFormat);
 
        GLuint gx = (m_width  + 15) / 16;
        GLuint gy = (m_height + 15) / 16;
@@ -364,10 +411,15 @@ void SimulationGPU::update(float dt, float mouseX, float mouseY, bool mousePress
 // --------------------------------------------------
 void SimulationGPU::createComputeShaders()
 {
+    std::string defines = "";
+    if (m_textureFormat == TextureFormat::R8) defines = "#define FORMAT_R8";
+    else if (m_textureFormat == TextureFormat::RG8) defines = "#define FORMAT_RG8";
+    else defines = "#define FORMAT_RGBA8";
+
     // update.comp
     {
         std::string compSource = readFile("shaders/update.comp");
-        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER);
+        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER, defines);
 
         m_updateProgramID = glCreateProgram();
         glAttachShader(m_updateProgramID, compShader);
@@ -386,7 +438,7 @@ void SimulationGPU::createComputeShaders()
     // blur.comp
     {
         std::string compSource = readFile("shaders/blur.comp");
-        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER);
+        GLuint compShader = compileShader(compSource, GL_COMPUTE_SHADER, defines);
 
         m_blurProgramID = glCreateProgram();
         glAttachShader(m_blurProgramID, compShader);
@@ -443,11 +495,22 @@ void SimulationGPU::createComputeShaders()
 
 void SimulationGPU::createTextures()
 {
-    // Creiamo due texture RGBA8
+    GLint internalFormat = GL_RGBA8;
+    GLenum format = GL_RGBA;
+
+    if (m_textureFormat == TextureFormat::R8) {
+        internalFormat = GL_R8;
+        format = GL_RED;
+    } else if (m_textureFormat == TextureFormat::RG8) {
+        internalFormat = GL_RG8;
+        format = GL_RG;
+    }
+
+    // Creiamo due texture
     glGenTextures(1, &m_textureIDIn);
     glBindTexture(GL_TEXTURE_2D, m_textureIDIn);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_width, m_height, 0,
+                 format, GL_UNSIGNED_BYTE, nullptr);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -459,8 +522,8 @@ void SimulationGPU::createTextures()
     // Seconda texture per ping-pong
     glGenTextures(1, &m_textureIDOut);
     glBindTexture(GL_TEXTURE_2D, m_textureIDOut);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, m_width, m_height, 0,
+                 format, GL_UNSIGNED_BYTE, nullptr);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -475,13 +538,11 @@ void SimulationGPU::initializeParticles()
     std::vector<GpuParticle> particles(m_maxParticles);
     for (int i = 0; i < m_maxParticles; ++i)
     {
-        particles[i].position[0] = static_cast<float>(rand() % m_width);
-        particles[i].position[1] = static_cast<float>(rand() % m_height);
-
-        particles[i].angle = static_cast<float>(rand()) / RAND_MAX * 6.28318530718f;
-
-        float r = static_cast<float>(rand()) / RAND_MAX;
-        particles[i].speed = m_speedMin + r * (m_speedMax - m_speedMin);
+        // Initialize to 0,0 or center, doesn't matter much as they are inactive
+        particles[i].position[0] = m_width * 0.5f;
+        particles[i].position[1] = m_height * 0.5f;
+        particles[i].angle = 0.0f;
+        particles[i].speed = m_speedMin;
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[0]);
@@ -560,4 +621,75 @@ void SimulationGPU::printPerformanceStats()
          std::cout << "[GPU] Grid: " << gridMs << "ms | Update: " << updateMs 
                    << "ms | Blur: " << blurMs << "ms" << std::endl;
     }
+}
+void SimulationGPU::resize(int width, int height, TextureFormat format)
+{
+    if (m_width == width && m_height == height && m_textureFormat == format) return;
+
+    m_width = width;
+    m_height = height;
+    m_textureFormat = format;
+
+    // Wait until GPU is idle
+    glFinish();
+
+    // Recreate Textures
+    glDeleteTextures(1, &m_textureIDIn);
+    glDeleteTextures(1, &m_textureIDOut);
+    createTextures();
+
+    // Recreate Grid (depends on width/height)
+    if (m_gridHeadBuffer) { glDeleteBuffers(1, &m_gridHeadBuffer); m_gridHeadBuffer = 0; }
+    if (m_particleNextBuffer) { glDeleteBuffers(1, &m_particleNextBuffer); m_particleNextBuffer = 0; }
+    createGridBuffers();
+
+    // Recompile Shaders (Defines changed)
+    if (m_updateProgramID) glDeleteProgram(m_updateProgramID);
+    if (m_blurProgramID) glDeleteProgram(m_blurProgramID);
+    // grid shaders don't change
+    createComputeShaders();
+
+    // Re-distribute particles to new bounds
+    // Re-distribute particles: Start from scratch with ramp up
+    initializeParticles();
+    m_activeParticles = 0; // Reset active count to trigger ramp-up again
+    m_targetParticles = m_maxParticles; // Should preserve current target actually? Let's check main.
+                                        // Main sets targetParticleCount every frame. So it will ramp up to that.
+}
+
+void SimulationGPU::resetParticlePositions(int startIdx, int count)
+{
+    if (count <= 0) return;
+    
+    std::vector<GpuParticle> particles(count);
+    float cx = m_width * 0.5f;
+    float cy = m_height * 0.5f;
+    
+    for (int i = 0; i < count; ++i)
+    {
+        // Random point in a small circle at center
+        float r = 10.0f * sqrt(static_cast<float>(rand()) / RAND_MAX);
+        float theta = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+        
+        particles[i].position[0] = cx + r * cos(theta);
+        particles[i].position[1] = cy + r * sin(theta);
+        
+        // Random direction out
+        particles[i].angle = theta; // Explode outwards
+        // Or random angle:
+        // particles[i].angle = static_cast<float>(rand()) / RAND_MAX * 6.2831853f;
+
+        float rnd = static_cast<float>(rand()) / RAND_MAX;
+        particles[i].speed = m_speedMin + rnd * (m_speedMax - m_speedMin);
+    }
+
+    GLintptr offset = static_cast<GLintptr>(startIdx) * sizeof(GpuParticle);
+    GLsizeiptr sizeBytes = static_cast<GLsizeiptr>(count) * sizeof(GpuParticle);
+    
+    // Update both buffers just in case
+    for (int i = 0; i < 2; ++i) {
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[i]);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, sizeBytes, particles.data());
+    }
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }

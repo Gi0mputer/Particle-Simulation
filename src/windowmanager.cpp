@@ -50,15 +50,15 @@ bool WindowManager::shouldClose() const {
 }
 
 void WindowManager::handleInput() {
-    static bool f11Pressed = false; // Per evitare pressioni multiple
+    static bool f12Pressed = false; 
 
-    if (glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS) {
-        if (!f11Pressed) {
+    if (glfwGetKey(window, GLFW_KEY_F12) == GLFW_PRESS) {
+        if (!f12Pressed) {
             toggleFullscreen();
-            f11Pressed = true;
+            f12Pressed = true;
         }
     } else {
-        f11Pressed = false;
+        f12Pressed = false;
     }
 }
 
@@ -92,6 +92,12 @@ void WindowManager::toggleFullscreen() {
     }
 
     isFullscreen = !isFullscreen;
+}
+
+void WindowManager::setFullscreen(bool enable) {
+    if (isFullscreen != enable) {
+        toggleFullscreen();
+    }
 }
 
 int WindowManager::getWidth() const {

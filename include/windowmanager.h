@@ -16,10 +16,12 @@ public:
 
     int getWidth() const;
     int getHeight() const;
+    void toggleFullscreen();
+    bool getIsFullscreen() const { return isFullscreen; }
+    void setFullscreen(bool enable);
 
 private:
     static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
-    void toggleFullscreen();
 
     GLFWwindow* window;
     GLFWmonitor* monitor;

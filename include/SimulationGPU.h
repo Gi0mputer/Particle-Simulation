@@ -13,17 +13,24 @@ struct GpuParticle {
 class SimulationGPU
 {
 public:
+
     SimulationGPU(int particleCount, int width, int height);
     ~SimulationGPU();
 
     void initialize();
     void update(float dt, float mouseX, float mouseY, bool mousePressed, int mouseMode);
 
+    enum class TextureFormat { R8, RG8, RGBA8 };
+
     // Accesso al buffer delle particelle (per eventuale debug drawing)
     GLuint getParticleBuffer() const { return m_particleBuffers[m_currentBuffer]; }
     int    getParticleCount() const  { return m_activeParticles; }
     int    getMaxParticleCount() const { return m_maxParticles; }
     void   setActiveParticleCount(int count);
+
+    // Resizes simulation and changes texture format upon request
+    void   resize(int width, int height, TextureFormat format);
+    TextureFormat getTextureFormat() const { return m_textureFormat; }
 
     // Restituisce la texture finale (dopo l'ultimo pass). 
     GLuint getFinalTexture() const { return m_textureIDIn; }
@@ -141,9 +148,15 @@ private:
 private:
     int   m_maxParticles;
     int   m_activeParticles;
+    int   m_targetParticles;
+    bool  m_rampingUp;
+
     int   m_width;
     int   m_height;
+    TextureFormat m_textureFormat;
     bool  m_initialized;
+
+    void  resetParticlePositions(int startIdx, int count);
 
     // Buffer particelle in double buffering
     GLuint m_particleBuffers[2];

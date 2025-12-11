@@ -203,6 +203,10 @@ int main(int argc, char **argv)
             
             // Particles
             int targetParticleCount = 1000000;
+            
+            // Texture / Resolution
+            int resolutionPreset = 1; // 0=720, 1=1080, 2=1440, 3=4K
+            int textureFormat = 2;    // 0=R8, 1=RG8, 2=RGBA8
         } params;
         
         constexpr int maxParticles = 5000000;
@@ -272,7 +276,10 @@ int main(int argc, char **argv)
             p.mouseStrength = std::clamp(p.mouseStrength, 0.0f, 10.0f);
             p.mouseGaussianSigma = std::clamp(p.mouseGaussianSigma, 10.0f, 5000.0f);
             p.mouseOscFreq = std::clamp(p.mouseOscFreq, 0.01f, 20.0f);
+            p.mouseOscFreq = std::clamp(p.mouseOscFreq, 0.01f, 20.0f);
             p.mouseRingRadius = std::clamp(p.mouseRingRadius, 10.0f, 5000.0f);
+            p.resolutionPreset = std::clamp(p.resolutionPreset, 0, 3);
+            p.textureFormat = std::clamp(p.textureFormat, 0, 2);
         };
 
         auto saveParamsToFile = [&](const SimulationParams& p, const std::string& path) -> bool {
@@ -326,6 +333,8 @@ int main(int argc, char **argv)
                 out << "mouseRingOverlay " << (data.mouseRingOverlay ? 1 : 0) << "\n";
                 out << "mouseRingRadius " << data.mouseRingRadius << "\n";
                 out << "targetParticleCount " << data.targetParticleCount << "\n";
+                out << "resolutionPreset " << data.resolutionPreset << "\n";
+                out << "textureFormat " << data.textureFormat << "\n";
                 return true;
             } catch (...) {
                 return false;
@@ -380,6 +389,8 @@ int main(int argc, char **argv)
                 else if (key == "mouseRingOverlay") { int v; if (iss >> v) p.mouseRingOverlay = (v != 0); }
                 else if (key == "mouseRingRadius") iss >> p.mouseRingRadius;
                 else if (key == "targetParticleCount") iss >> p.targetParticleCount;
+                else if (key == "resolutionPreset") iss >> p.resolutionPreset;
+                else if (key == "textureFormat") iss >> p.textureFormat;
             }
             clampParams(p);
             return true;
@@ -494,11 +505,20 @@ int main(int argc, char **argv)
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.5f, 0.2f, 0.2f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.25f, 0.25f, 1.0f));
                     
-                    float buttonWidth = 60.0f;
-                    ImGui::SetCursorPosX(menuWidth - buttonWidth - 25);
-                    if (ImGui::Button(" X ", ImVec2(buttonWidth, 40)))
+                    float hideButtonWidth = 90.0f;
+                    float fullscreenButtonWidth = 140.0f;
+                    float padding = 10.0f; // Padding between buttons
+                    ImGui::SetCursorPosX(menuWidth - hideButtonWidth - fullscreenButtonWidth - padding - 25);
+                    if (ImGui::Button(" HIDE ", ImVec2(hideButtonWidth, 40)))
                     {
                         showMenu = false;
+                    }
+                    ImGui::SameLine();
+                    
+                    bool isFs = windowManager.getIsFullscreen();
+                    if (ImGui::Button(isFs ? " WINDOW " : " FULLSCREEN ", ImVec2(fullscreenButtonWidth, 40)))
+                    {
+                        windowManager.toggleFullscreen();
                     }
                     ImGui::PopStyleColor(3);
                     
@@ -519,11 +539,11 @@ int main(int argc, char **argv)
                     ImGui::BeginChild("ScrollingRegion", ImVec2(0, 0), false, ImGuiWindowFlags_None);
 
                     // ========== CONFIGURATIONS ==========
-                    if (ImGui::CollapsingHeader("[ CONFIGURATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
+                    if (ImGui::CollapsingHeader("[ CONFIGURATIONS ]"))
                     {
                         ImGui::Indent(10);
                         // Info box
-                        if (ImGui::TreeNodeEx("Info", ImGuiTreeNodeFlags_DefaultOpen))
+                        if (ImGui::TreeNodeEx("Info"))
                         {
                             ImGui::PushTextWrapPos(0.0f);
                             ImGui::TextColored(ImVec4(0.7f,0.8f,0.9f,1.0f), "Preset corrente:");
@@ -556,7 +576,7 @@ int main(int argc, char **argv)
                         }
 
                         // Preset management
-                        if (ImGui::TreeNodeEx("Presets", ImGuiTreeNodeFlags_DefaultOpen))
+                        if (ImGui::TreeNodeEx("Presets"))
                         {
                             ImGui::Spacing();
                             ImGui::InputText("Nome preset", presetNameBuf, IM_ARRAYSIZE(presetNameBuf));
@@ -616,10 +636,12 @@ int main(int argc, char **argv)
                                 ImGui::BeginChild("PresetList", ImVec2(0, 150), true);
                                 for (const auto& name : presetList) {
                                     bool isCurrent = (currentPresetLabel == name || currentPresetLabel == (configDir + "/" + name));
-                                    if (ImGui::Selectable(name.c_str(), isCurrent)) {
+                                    if (ImGui::Selectable(name.c_str(), isCurrent, ImGuiSelectableFlags_None, ImVec2(menuWidth - 100, 0))) { // Leave space for delete button
                                         std::string stem = std::filesystem::path(name).stem().string();
                                         std::snprintf(presetNameBuf, IM_ARRAYSIZE(presetNameBuf), "%s", stem.c_str());
                                     }
+                                    
+                                    // Handle Double Click to Load
                                     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                                         std::string path = std::string(configDir) + "/" + name;
                                         if (loadParamsFromFile(params, path)) {
@@ -629,6 +651,28 @@ int main(int argc, char **argv)
                                             presetStatus = "Impossibile caricare " + path;
                                         }
                                     }
+
+                                    // Delete Button
+                                    ImGui::SameLine();
+                                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.1f, 0.1f, 1.0f));
+                                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.2f, 0.2f, 1.0f));
+                                    if (ImGui::Button((" X ##" + name).c_str())) {
+                                        std::string path = std::string(configDir) + "/" + name;
+                                        try {
+                                            if (std::filesystem::remove(path)) {
+                                                presetStatus = "Eliminato " + name;
+                                                // If we deleted the current preset, clear label
+                                                if (currentPresetLabel == path || currentPresetLabel == name) {
+                                                    currentPresetLabel = "Nessun preset";
+                                                }
+                                            } else {
+                                                presetStatus = "Errore eliminazione " + name;
+                                            }
+                                        } catch (...) {
+                                            presetStatus = "Eccezione eliminazione " + name;
+                                        }
+                                    }
+                                    ImGui::PopStyleColor(2);
                                 }
                                 ImGui::EndChild();
                                 ImGui::TreePop();
@@ -645,7 +689,7 @@ int main(int argc, char **argv)
                     ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.28f, 0.30f, 0.38f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.32f, 0.34f, 0.42f, 1.0f));
                     
-                    if (ImGui::CollapsingHeader("[ SIMULATIONS ]", ImGuiTreeNodeFlags_DefaultOpen))
+                    if (ImGui::CollapsingHeader("[ SIMULATIONS ]"))
                     {
                         ImGui::Indent(10);
 
@@ -654,12 +698,24 @@ int main(int argc, char **argv)
                         params.targetParticleCount = std::clamp(params.targetParticleCount, 10000, maxCount);
                         ImGui::TextColored(ImVec4(0.7f, 0.8f, 0.7f, 1.0f), "Particles");
                         ImGui::SliderInt("##ParticleCount", &params.targetParticleCount, 10000, maxCount, "%d", ImGuiSliderFlags_AlwaysClamp);
+                        
+                        ImGui::Spacing();
+                        // --- Boundary ---
+                        static const char* boundaryOptions[] = {
+                            "Toroidal wrap",
+                            "Rigid bounce (reflect)",
+                            "Klein bottle (full twist)"
+                        };
+                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Boundary");
+                        ImGui::Combo("##BoundaryMode", &params.boundaryMode, boundaryOptions, IM_ARRAYSIZE(boundaryOptions));
+
                         ImGui::Spacing();
                         ImGui::Separator();
                         
                         // --- Physarum ---
                         ImGui::Checkbox("Physarum", &params.physarumEnabled);
-                    if (ImGui::TreeNodeEx("Physarum Settings", ImGuiTreeNodeFlags_DefaultOpen))
+                        ImGui::SameLine();
+                        if (ImGui::TreeNode("Settings##Physarum"))
                     {
                         ImGui::Spacing();
                             if (params.physarumEnabled) {
@@ -690,7 +746,8 @@ int main(int argc, char **argv)
                         
                         // --- Boids ---
                         ImGui::Checkbox("Boids", &params.boidsEnabled);
-                        if (ImGui::TreeNode("Boids Settings"))
+                        ImGui::SameLine();
+                        if (ImGui::TreeNode("Settings##Boids"))
                         {
                             ImGui::Spacing();
                             if (params.boidsEnabled) {
@@ -708,7 +765,7 @@ int main(int argc, char **argv)
                         ImGui::Spacing();
                         
                         // --- Physics ---
-                        if (ImGui::TreeNodeEx("Physics", ImGuiTreeNodeFlags_DefaultOpen))
+                        if (ImGui::TreeNodeEx("Physics"))
                         {
                             ImGui::Spacing();
                             ImGui::SliderFloat("Inertia", &params.inertia, 0.0f, 0.99f, "%.2f");
@@ -734,15 +791,7 @@ int main(int argc, char **argv)
 
                         ImGui::Spacing();
 
-                        // --- Boundary / Topology --- (direct)
-                        static const char* boundaryOptions[] = {
-                            "Toroidal wrap",
-                            "Rigid bounce (reflect)",
-                            "Klein bottle (full twist)"
-                        };
-
-                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Boundary / Topology");
-                        ImGui::Combo("##BoundaryMode", &params.boundaryMode, boundaryOptions, IM_ARRAYSIZE(boundaryOptions));
+                        // (Boundary moved up)
                         ImGui::Spacing();
                         
                         
@@ -756,61 +805,99 @@ int main(int argc, char **argv)
                     {
                         ImGui::Indent(10);
                         ImGui::Spacing();
-                        ImGui::ColorEdit3("Color A", params.color1);
-                        ImGui::ColorEdit3("Color B", params.color2);
-                        ImGui::ColorEdit3("Background", params.backgroundColor);
-                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Sfondo solido, non influisce sulla simulazione");
+
+                        // 1. Texture Settings
+                        if (ImGui::TreeNodeEx("Texture Settings")) {
+                             const char* fmtItems[] = { "R8 (1 Ch: Low Bandwidth)", "RG8 (2 Ch: Medium)", "RGBA8 (4 Ch: Standard)" };
+                             ImGui::Combo("Format", &params.textureFormat, fmtItems, IM_ARRAYSIZE(fmtItems));
+                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("R8=Solo Rosso (veloce), RG8=Rosso+Verde, RGBA8=Full Pixel Color");
+                             
+                             const char* resItems[] = { "720p (HD)", "1080p (FHD)", "1440p (QHD)", "2160p (4K)" };
+                             ImGui::Combo("Resolution", &params.resolutionPreset, resItems, IM_ARRAYSIZE(resItems));
+                             
+                             ImGui::TreePop();
+                             ImGui::Separator();
+                             ImGui::Spacing();
+                        }
+
+                        // 2. Trail Emission
+                        if (ImGui::TreeNode("Trail Emission")) {
+                            ImGui::Spacing();
+                            ImGui::TextColored(ImVec4(0.7f,0.8f,0.7f,1.0f), "[ Data Generation ]");
+                            
+                            // Decay
+                            ImGui::SliderFloat("Trail Decay", &params.trailFade, 0.90f, 0.9999f, "%.4f");
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Determina quanto velocemente la scia scompare (0.99 = lunga, 0.90 = breve)");
+
+                            ImGui::Spacing();
+
+                            // Colors
+                            ImGui::ColorEdit3("Color A", params.color1);
+                            ImGui::ColorEdit3("Color B", params.color2);
+                            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Colori base usati per l'interpolazione (A -> B)");
+
+                            ImGui::Spacing();
+                            
+                            // Source Logic
+                             static const char* colorSources[] = { "Particle Angle", "Speed (Manual Range)", "Speed (Auto Range)" };
+                             ImGui::Combo("Color Source", &params.colorSource, colorSources, IM_ARRAYSIZE(colorSources));
+                             
+                             if (params.colorSource == 1) { // Manual Speed
+                                ImGui::Indent();
+                                ImGui::SliderFloat("Speed Min", &params.colorSpeedMin, 0.0f, 1000.0f, "%.0f");
+                                ImGui::SliderFloat("Speed Max", &params.colorSpeedMax, params.colorSpeedMin + 1.0f, 2000.0f, "%.0f");
+                                ImGui::Unindent();
+                             } else if (params.colorSource == 2) { // Auto Speed
+                                ImGui::Indent();
+                                float autoMin = simulation.getAutoColorSpeedMin();
+                                float autoMax = simulation.getAutoColorSpeedMax();
+                                ImGui::TextColored(ImVec4(0.6f,0.8f,1.0f,1.0f), "Auto Range: %.0f - %.0f", autoMin, autoMax);
+                                ImGui::Unindent();
+                             }
+                             
+                             ImGui::Spacing();
+                             // Mutation
+                             ImGui::SliderFloat("Mutation Offset", &params.colorOffset, 0.0f, 1.0f, "%.2f");
+                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Ruota la palette colori (offset globale)\nGenera variazioni nel tempo.");
+
+                             ImGui::Spacing();
+                             ImGui::TreePop();
+                        }
                         
-                        // New Color Mutation Logic
-                        ImGui::Separator();
-                        ImGui::Text("Mutation Logic (Chameleon)");
-                        ImGui::SliderFloat("Mutation Offset", &params.colorOffset, 0.0f, 0.5f, "%.2f");
-                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "0=Fisso, 0.5=Complementare");
                         ImGui::Spacing();
 
-                        ImGui::Separator();
-                        static const char* colorSources[] = { "Direzione (0° -> A, 180° -> B, 360° -> A)", "Modulo velocit\u00e0 (range manuale)", "Modulo velocit\u00e0 (range auto)" };
-                        ImGui::Combo("Color Source", &params.colorSource, colorSources, IM_ARRAYSIZE(colorSources));
-                        if (params.colorSource == 1) {
-                            ImGui::Indent(10);
-                            ImGui::SliderFloat("Speed min (color)", &params.colorSpeedMin, 0.0f, 1000.0f, "%.0f");
-                            ImGui::SliderFloat("Speed max (color)", &params.colorSpeedMax, params.colorSpeedMin + 1.0f, 1500.0f, "%.0f");
-                            ImGui::Unindent(10);
-                        } else if (params.colorSource == 2) {
-                            ImGui::Indent(10);
-                            float autoMin = simulation.getAutoColorSpeedMin();
-                            float autoMax = simulation.getAutoColorSpeedMax();
-                            bool hasStats = simulation.hasAutoSpeedStats();
-                            if (hasStats) {
-                                ImGui::TextColored(ImVec4(0.7f,0.8f,0.7f,1.0f), "Auto range: %.1f - %.1f", autoMin, autoMax);
-                            } else {
-                                ImGui::TextColored(ImVec4(0.7f,0.6f,0.4f,1.0f), "Auto range in stima...");
-                            }
-                            ImGui::TextColored(ImVec4(0.55f,0.55f,0.55f,1.0f), "Campione %d particelle ogni %.0f s", 4096, 3.0f);
-                            ImGui::Unindent(10);
+                        // 3. Post-Processing
+                        if (ImGui::TreeNode("Post-Processing")) {
+                             ImGui::Spacing();
+                             ImGui::TextColored(ImVec4(0.7f,0.8f,0.7f,1.0f), "[ Visual Style ]");
+                             
+                             ImGui::ColorEdit3("Background", params.backgroundColor);
+                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Colore di pulizia dello schermo (sfondo)");
+                             
+                             static const char* colorModes[] = { "Standard", "Legacy Supernova", "Neon Thermal", "Bismuth Iridescent", "Psycho Overflow" };
+                             ImGui::Combo("Aesthetics Mode", &params.colorMode, colorModes, IM_ARRAYSIZE(colorModes));
+                             
+                             if (params.colorMode >= 2) { // Neon effects
+                                ImGui::Indent();
+                                ImGui::SliderFloat("Cycle Speed", &params.neonSpeed, 0.0f, 5.0f);
+                                ImGui::SliderFloat("Band Frequency", &params.neonRange, 0.1f, 5.0f);
+                                ImGui::Unindent();
+                             }
+                             
+                             ImGui::Separator();
+                             ImGui::Text("Camera / Exposure");
+                             ImGui::SliderFloat("Exposure", &params.toneExposure, 0.1f, 10.0f, "%.2f");
+                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Moltiplicatore di luminosita' globale");
+
+                             ImGui::SliderFloat("Auto-Dim Threshold", &params.autoDimThreshold, 0.0f, 1.0f, "%.2f");
+                             if (ImGui::IsItemHovered()) ImGui::SetTooltip("Soglia di luminosita' media oltre cui scurire l'immagine");
+
+                             ImGui::SliderFloat("Auto-Dim Strength", &params.autoDimStrength, 0.0f, 1.0f, "%.2f");
+                             ImGui::SliderFloat("Global Dim", &params.autoDimGlobal, 0.0f, 20.0f, "%.1f");
+                             
+                             ImGui::TreePop();
                         }
-                        
-                        ImGui::Separator();
-                        static const char* colorModes[] = { "Standard", "Legacy Supernova", "Neon Thermal", "Bismuth Iridescent", "Psycho Overflow" };
-                        ImGui::Combo("Post-FX Mode", &params.colorMode, colorModes, IM_ARRAYSIZE(colorModes));
-                        
-                        if (params.colorMode >= 2) {
-                            ImGui::Indent(10);
-                            ImGui::Text("Neon Controls");
-                            ImGui::SliderFloat("Pulsation Speed", &params.neonSpeed, 0.0f, 5.0f);
-                            ImGui::SliderFloat("Ring Density", &params.neonRange, 0.1f, 3.0f);
-                            ImGui::Unindent(10);
-                        }
-                        
-                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "Scegli l'algoritmo di colorazione");
-                        ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f), "Mix based on particle angle");
-                        ImGui::Separator();
-                        ImGui::SliderFloat("Trail Decay", &params.trailFade, 0.90f, 0.9995f, "%.4f");
-                        ImGui::SliderFloat("Tone Exposure (log)", &params.toneExposure, 0.1f, 10.0f, "%.2f");
-                        ImGui::SliderFloat("Auto-Dim Threshold", &params.autoDimThreshold, 0.0f, 0.8f, "%.2f");
-                        ImGui::SliderFloat("Auto-Dim Strength", &params.autoDimStrength, 0.0f, 1.0f, "%.2f");
-                        ImGui::SliderFloat("Global Dim (1/(1+k*L))", &params.autoDimGlobal, 0.0f, 20.0f, "%.1f");
-                        ImGui::TextColored(ImVec4(0.6f,0.7f,0.8f,1.0f), "Decay più basso = più sottrazione, esposizione riduce i picchi, auto-dim abbassa la media");
+
                         ImGui::Spacing();
                         ImGui::Unindent(10);
                     }
@@ -818,7 +905,7 @@ int main(int argc, char **argv)
                     ImGui::Spacing();
 
                     // ========== MOUSE EFFECTS ==========
-                    if (ImGui::CollapsingHeader("[ MOUSE EFFECTS ]", ImGuiTreeNodeFlags_DefaultOpen))
+                    if (ImGui::CollapsingHeader("[ MOUSE EFFECTS ]"))
                     {
                         ImGui::Indent(10);
                         ImGui::Spacing();
@@ -860,6 +947,10 @@ int main(int argc, char **argv)
                 ImGui::End();
                 ImGui::PopStyleVar();
             }
+
+            // --- UPDATE RESOLUTION / FORMAT ---
+            Utils::SimulationManager::getSimulationSize((Utils::SimulationResolution)params.resolutionPreset, simWidth, simHeight);
+            simulation.resize(simWidth, simHeight, (SimulationGPU::TextureFormat)params.textureFormat);
 
             // --- UPDATE RENDER PIPELIE ---
             renderPipeline.setColorMode(params.colorMode);

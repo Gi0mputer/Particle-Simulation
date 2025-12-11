@@ -1,0 +1,8 @@
+1 - mutation offset è invece un argomento ampio che vorrei affrontare passo passo, era nato da un idea interessante di introdursi nel feedback loop e traslare di poco ma costantemente il colore per studiarne l'effetto.
+    in pratica però finiva per traslare tutto verso il bianco e nero (chissa perchè)
+    devo ragionare se l'idea è valida:
+    se il colore depositato cambia con il tempo, si tratta solo di una questione di invecchiamento ed estetica, in pratica facciamo colorare diversamente zone che invecchiano ma il comportamento delle particelle non cambia, rimane interessante.
+
+    Piu interessante ancora e piu vicino alla mia intuizione originale era qualcosa di piu profondo, qualcosa che influenzava anche il comportamento delle particelle.
+
+    Cosa ne pensi, lo studiamo e approfondiamo insieme?

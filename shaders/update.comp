@@ -18,7 +18,14 @@ layout(std430, binding = 1) writeonly buffer OutParticles {
 } outParticles;
 
 // Trail Map (Read/Write)
+// Trail Map (Read/Write)
+#ifdef FORMAT_R8
+layout(r8, binding = 2) uniform image2D outImage;
+#elif defined(FORMAT_RG8)
+layout(rg8, binding = 2) uniform image2D outImage;
+#else
 layout(rgba8, binding = 2) uniform image2D outImage;
+#endif
 
 // Boids Grid Buffers
 layout(std430, binding = 3) readonly buffer GridHeadBuffer {
@@ -241,7 +248,14 @@ float sense(Particle p, float sensorAngleOffset) {
 
     ivec2 coord = ivec2(sensorPos);
     vec4 val = imageLoad(outImage, coord);
+    
+#ifdef FORMAT_R8
+    return val.r;
+#elif defined(FORMAT_RG8)
+    return val.r;
+#else
     return dot(val.rgb, vec3(0.299, 0.587, 0.114)); 
+#endif 
 }
 
 void main()
@@ -517,8 +531,17 @@ void main()
 
     // --- 5. DEPOSIT TRAIL ---
     ivec2 coord = ivec2(p.position);
-    
-    // New Color Logic: Adaptive
+    float depositAmount = 0.05 * uPhysarumIntensity;
+
+#if defined(FORMAT_R8)
+    // R = Density
+    vec4 deposit = vec4(depositAmount, 0.0, 0.0, 0.0);
+#elif defined(FORMAT_RG8)
+    // R = Density, G = Speed (normalized approx 0-200)
+    float speedVal = clamp(p.speed / 200.0, 0.0, 1.0);
+    vec4 deposit = vec4(depositAmount, speedVal * depositAmount, 0.0, 0.0);
+#else
+    // RGBA8 = Visual Color
     // Base factor: angle or speed
     float colorFactor = 0.0;
     if (uColorSource == 0) {
@@ -543,6 +566,7 @@ void main()
              // If dark, fallback to base palette
              rgb = basePalette;
         } else {
+             hsv2rgb(vec3(0.0)); // Fake call to ensure function is kept if optimized? No.
              // Shift Hue of seen color
              vec3 hsv = rgb2hsv(seenCol);
              hsv.x = fract(hsv.x + uColorOffset); // apply offset
@@ -552,8 +576,8 @@ void main()
         }
     }
     
-    float depositAmount = 0.05 * uPhysarumIntensity;
     vec4 deposit = vec4(rgb, 1.0) * depositAmount;
+#endif
     
     vec4 currentVal = imageLoad(outImage, coord);
     vec4 newVal = min(currentVal + deposit, vec4(1.0));

@@ -45,12 +45,16 @@ namespace Utils
         bool refreshNeeded;
     };
 
+
+
+
     //------------------------------------------------------------
     // Gestione delle dimensioni di sumulazione
     enum class SimulationResolution
     {
         HD_720,
         FHD_1080,
+        QHD_1440,
         UHD_4K,
         NATIVE
     };

@@ -147,6 +147,10 @@ namespace Utils
             simWidth = 3840;
             simHeight = 2160;
             break;
+        case SimulationResolution::QHD_1440:
+            simWidth = 2560;
+            simHeight = 1440;
+            break;
         case SimulationResolution::FHD_1080:
             simWidth = 1920;
             simHeight = 1080;
