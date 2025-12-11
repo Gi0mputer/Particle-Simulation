@@ -2,9 +2,16 @@
 # Builds Release and copies vcpkg DLLs to build output
 $ErrorActionPreference = 'Stop'
 $repo = Convert-Path "$PSScriptRoot\.."
-$cmake = "C:\tools\cmake-3.30.0-windows-x86_64\bin\cmake.exe"
+$cmake = "cmake"
 
-if (-not (Test-Path $cmake)) { Write-Error "cmake.exe not found at $cmake"; exit 1 }
+if (-not (Get-Command $cmake -ErrorAction SilentlyContinue)) {
+    $hardcoded = "C:\tools\cmake-3.30.0-windows-x86_64\bin\cmake.exe"
+    if (Test-Path $hardcoded) {
+        $cmake = $hardcoded
+    } else {
+        Write-Error "cmake not found in PATH or at $hardcoded"; exit 1
+    }
+}
 
 Set-Location $repo
 
