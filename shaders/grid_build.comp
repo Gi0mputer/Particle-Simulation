@@ -5,6 +5,10 @@ struct Particle {
     vec2 position;
     float angle;
     float speed;
+    float species;
+    float pad1;
+    float pad2;
+    float pad3;
 };
 
 // Must match binding in SimulationGPU

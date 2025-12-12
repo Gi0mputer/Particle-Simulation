@@ -8,6 +8,8 @@ struct GpuParticle {
     float position[2];
     float angle;
     float speed;
+    float species;     // 0.0, 1.0, etc.
+    float _pad[3];     // Padding to reach 32 bytes (2x vec4 alignment friendly)
 };
 
 class SimulationGPU

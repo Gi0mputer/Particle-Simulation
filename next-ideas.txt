@@ -1,3 +1,6 @@
+Il testo, specialmente nella parte finale, è scritto di getto e a caldo per consolidare l'intuizione, ma va riscritto e reso ordinato e chiaro, eventualmente le parti ambigue espresse con domanda interrogativa (?)
+
+
 1 - mutation offset è invece un argomento ampio che vorrei affrontare passo passo, era nato da un idea interessante di introdursi nel feedback loop e traslare di poco ma costantemente il colore per studiarne l'effetto.
     in pratica però finiva per traslare tutto verso il bianco e nero (chissa perchè)
     devo ragionare se l'idea è valida:
@@ -6,3 +9,32 @@
     Piu interessante ancora e piu vicino alla mia intuizione originale era qualcosa di piu profondo, qualcosa che influenzava anche il comportamento delle particelle.
 
     Cosa ne pensi, lo studiamo e approfondiamo insieme?
+
+2 - un idea di estensione abbastanza complicata, ma interessante:
+    la possibilità di muoversi, ad esempio con le frecciette.
+
+    e come opzione attivabile (checkbox vicino a borders), la possibilita di dare l'illusione di un mondo piu grande dove la simulazione avviene,
+    dobbiamo trovare un modo per creare le particelle prima che arrivino al bordo (magari una simulazione piu grande e un crop per iniziare a generare pattern nei bordi.)
+ 
+
+3 - sarebbe inoltre interessante creare delle specie, quindi delle particelle raggruppate per specie e comportamenti simili, magari che vengono attratte solo dalla traccia del proprio colore o interagiscano come boids solo con la loro specie.
+
+(EXTRA DA VALUTARE TEMPO DI SVILUPPO)
+
+4 - inoltre sarebbe interessante fare si che una zona sulla texture, quando occupata mediamente piu da una specie che da un altra, abbia delle forze locali come quelle del mouse, ma proporzionali alla presenza di una specie nella zona,
+    ad esempio due specie, potrebbero avere una che influenza la zona con forza a vortice in senso orario, un altra antiorario, un altra creare attrazioni etc.
+    le forze devono essere molto molto piu blande, situate a zone, per fare questo possiamo sfruttare il quadtree quando calcoliamo le collisioni.
+
+5 - da fare prima del punto (4) probabilmente, 
+        ho realizzato che non abbiamo lavorato sul sistemare e rendere efficienti le parti legate alle collisioni,
+        attivando l'opzione si ha un comportamento errato di movimento velocissimo tipo energia infinita
+        e non ho controllato il meccanismo con cui collidono i boids, probabilmente dovremmo creare un engine o una zona dedicata alla collisione dello shader (o uno shader separato a seconda di cosa è meglio) unica da utilizzare ogni volta che c'è bisogno di conoscere una collisione.
+        il quad tree è utile per conoscere a zone piu grandi il numero totale di particelle al di sotto di esso, quindi potremmo usarlo per determinare le zone a cui assegnare le forze del punto 4.
+   
+
+   [IGNORA QUESTO PUNTO PER ORA]
+   [ASTRATTO, DA CAPIRE SE FATTIBILE, DA FINIERE]
+6 - Un ultima idea interessante sarebbe quella di cercare un evoluzione nel comportamento, come similmente si era tentato di fare con l'idea del color mutation.
+    per comportamento si intende che se attivato il parametro una specie determinata di particelle contiene un informazione (un numero tipo) che dipende dal numero delle particelle vicine (questo fattibile solo se con quadtree efficacie possiamo creare un parametro che è in grado di far )
+        
+    

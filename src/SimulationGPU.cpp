@@ -190,6 +190,8 @@ void SimulationGPU::setActiveParticleCount(int count)
 
             float r = static_cast<float>(rand()) / RAND_MAX;
             particles[i].speed = m_speedMin + r * (m_speedMax - m_speedMin);
+            particles[i].species = static_cast<float>(rand() % 3);
+            particles[i]._pad[0] = 0; particles[i]._pad[1] = 0; particles[i]._pad[2] = 0;
         }
 
         GLintptr offset = static_cast<GLintptr>(start) * sizeof(GpuParticle);
@@ -543,6 +545,8 @@ void SimulationGPU::initializeParticles()
         particles[i].position[1] = m_height * 0.5f;
         particles[i].angle = 0.0f;
         particles[i].speed = m_speedMin;
+        particles[i].species = static_cast<float>(rand() % 3);
+        particles[i]._pad[0] = 0; particles[i]._pad[1] = 0; particles[i]._pad[2] = 0;
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_particleBuffers[0]);
@@ -681,6 +685,8 @@ void SimulationGPU::resetParticlePositions(int startIdx, int count)
 
         float rnd = static_cast<float>(rand()) / RAND_MAX;
         particles[i].speed = m_speedMin + rnd * (m_speedMax - m_speedMin);
+        particles[i].species = static_cast<float>(rand() % 3);
+        particles[i]._pad[0] = 0; particles[i]._pad[1] = 0; particles[i]._pad[2] = 0;
     }
 
     GLintptr offset = static_cast<GLintptr>(startIdx) * sizeof(GpuParticle);
